@@ -229,17 +229,27 @@ A full-stack Enterprise Field QA Management System in a TypeScript monorepo (bac
 ### What's deployed on VPS
 | Container | Port | Status |
 |---|---|---|
-| `qa-frontend` | `8080` | 🟡 Ready for first boot |
-| `qa-backend` | `3001` | 🟡 Ready for first boot |
-| `qa-db` | internal | 🟡 Ready for first boot |
+| `qa-frontend` | `8080` | 🟢 Healthy — serves React SPA |
+| `qa-backend` | `3001` | 🟢 Healthy — `{"status":"ok"}` |
+| `qa-db` | internal | 🟢 Healthy — 7 migrations applied |
 
-Access URL: `http://VPS_IP:8080`
+Access URL: `http://103.93.161.157:8080`
 
-### Next Steps (First Boot)
-1. Open firewall: `sudo ufw allow 8080/tcp`
-2. Create `.env` from `.env.example` with production values
-3. Run: `docker compose -f docker-compose.prod.yml up --build -d`
-4. Verify: `curl http://localhost:8080/health` && `curl http://localhost:3001/health`
+### Final Verification (2026-05-05)
+- ✅ Backend health: `curl http://103.93.161.157:3001/health` → `{"status":"ok"}`
+- ✅ Frontend health: `curl http://103.93.161.157:8080/health` → `healthy`
+- ✅ Public HTML served: `curl http://103.93.161.157:8080/` → React SPA
+- ✅ Database: `psql` → 0 users (fresh install), 7 migrations applied
+- ✅ All 3 containers `Up` and `healthy`
+- ✅ Dockerfile issues fixed: removed non-existent workspace `node_modules` COPY
+- ✅ Prisma binary target fixed: added `linux-musl-openssl-3.0.x`
+
+### Bug Fixes During Deployment
+| Issue | Fix |
+|---|---|
+| Dockerfile COPY `shared/node_modules` / `frontend/node_modules` failed | Removed COPY lines — npm workspaces hoists to root |
+| Prisma Client binary target mismatch (`linux-musl` vs `linux-musl-openssl-3.0.x`) | Added `binaryTargets = ["native", "linux-musl-openssl-3.0.x"]` to `schema.prisma` |
+| Container name conflict on restart | `docker compose down` before `up -d` |
 
 ### Pipeline Status
-🟢 **LIVE** — Every push to `main` auto-deploys to VPS
+🟢 **LIVE** — `http://103.93.161.157:8080` — Every push to `main` auto-deploys
