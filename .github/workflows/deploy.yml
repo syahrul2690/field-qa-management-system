@@ -14,14 +14,27 @@ jobs:
           host: ${{ secrets.VPS_HOST }}
           username: ${{ secrets.VPS_USER }}
           key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 600s
           script: |
+            set -e
+            echo "=== Starting deploy ==="
+            echo "Host: ${{ secrets.VPS_HOST }}"
+            echo "User: ${{ secrets.VPS_USER }}"
+            echo "PWD: $(pwd)"
+            echo "=== Git pull ==="
             # First-time clone if directory doesn't exist
             if [ ! -d ~/field-qa-management-system ]; then
+              echo "Cloning repo..."
               cd ~
               git clone git@github-field-qa:syahrul2690/field-qa-management-system.git field-qa-management-system
             fi
             cd ~/field-qa-management-system
             git pull origin main
+            echo "=== Docker build ==="
             docker compose -f docker-compose.prod.yml build --no-cache backend frontend
+            echo "=== Docker up ==="
             docker compose -f docker-compose.prod.yml up -d
+            echo "=== Prune images ==="
             docker image prune -f
+            echo "=== Deploy complete ==="
+            docker ps --filter name=qa-
