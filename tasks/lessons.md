@@ -89,3 +89,26 @@ _This file tracks patterns and corrections to prevent repeated mistakes._
 - Include copy-pasteable SSH commands for every operation.
 - Document both manual deploy (SSH + docker compose) and auto-deploy (GitHub Actions).
 - Always explain the "why" for gotchas (e.g., Prisma version pinning, port conflicts) so future maintainers understand the constraint.
+
+### Lesson 13: GitHub Deploy Keys are unique per repository
+- If you try to add the same public key as a Deploy Key on a second repo, GitHub rejects it with "Key is already in use".
+- Solution: generate a **new** SSH key pair for each repository, then use an SSH host alias in `~/.ssh/config` to tell Git which key to use:
+  ```ssh
+  Host github-field-qa
+      HostName github.com
+      User git
+      IdentityFile ~/.ssh/field_qa_deploy
+      IdentitiesOnly yes
+  ```
+- Then use `git clone git@github-field-qa:user/repo.git` instead of `git@github.com`.
+- This keeps each repo's deploy key isolated while the VPS can still access multiple repos.
+
+### Lesson 14: GitHub Actions auto-deploy workflow must handle first-time clone
+- A deploy workflow that does `cd ~/project && git pull` fails on first run because the directory doesn't exist.
+- Always add a guard:
+  ```bash
+  if [ ! -d ~/project ]; then
+    git clone git@github-field-qa:user/repo.git ~/project
+  fi
+  cd ~/project && git pull origin main
+  ```

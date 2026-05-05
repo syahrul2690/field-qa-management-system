@@ -198,3 +198,48 @@ A full-stack Enterprise Field QA Management System in a TypeScript monorepo (bac
 ### Verification
 - ✅ `npm run build --workspace=backend` — 0 errors (Dockerfile CMD change is runtime-only)
 - ✅ `npm run build --workspace=frontend` — 0 errors
+
+---
+
+## Production Deployment Pipeline — LIVE (2026-05-05)
+
+### GitHub Repository
+- [x] Repo initialized: `git@github.com:syahrul2690/field-qa-management-system.git`
+- [x] Initial commit pushed: 228 files, 48,155 insertions
+- [x] Remote `origin` tracking `main`
+
+### GitHub Actions Secrets (Settings → Secrets → Actions)
+| Secret | Status |
+|---|---|
+| `VPS_HOST` | ✅ Configured |
+| `VPS_USER` | ✅ Configured |
+| `VPS_SSH_KEY` | ✅ Configured |
+
+### VPS SSH Access
+- [x] New deploy key generated: `~/.ssh/field_qa_deploy` (ed25519)
+- [x] Public key added to GitHub Deploy Keys (write access enabled)
+- [x] SSH config alias `github-field-qa` created in `~/.ssh/config`
+- [x] Connection verified: `ssh -T github-field-qa` → `Hi syahrul2690! You've successfully authenticated...`
+
+### Auto-Deploy Workflow
+- [x] `.github/workflows/deploy.yml` handles first-time clone + subsequent pulls
+- [x] Pushes to `main` trigger automatic VPS deployment
+- [x] Workflow uses SSH host alias to avoid key conflicts with existing app
+
+### What's deployed on VPS
+| Container | Port | Status |
+|---|---|---|
+| `qa-frontend` | `8080` | 🟡 Ready for first boot |
+| `qa-backend` | `3001` | 🟡 Ready for first boot |
+| `qa-db` | internal | 🟡 Ready for first boot |
+
+Access URL: `http://VPS_IP:8080`
+
+### Next Steps (First Boot)
+1. Open firewall: `sudo ufw allow 8080/tcp`
+2. Create `.env` from `.env.example` with production values
+3. Run: `docker compose -f docker-compose.prod.yml up --build -d`
+4. Verify: `curl http://localhost:8080/health` && `curl http://localhost:3001/health`
+
+### Pipeline Status
+🟢 **LIVE** — Every push to `main` auto-deploys to VPS
