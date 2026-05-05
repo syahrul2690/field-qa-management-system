@@ -18,7 +18,7 @@ jobs:
             # First-time clone if directory doesn't exist
             if [ ! -d ~/field-qa-management-system ]; then
               cd ~
-              git clone git@github.com:syahrul2690/field-qa-management-system.git field-qa-management-system
+              git clone git@github-field-qa:syahrul2690/field-qa-management-system.git field-qa-management-system
             fi
             cd ~/field-qa-management-system
             git pull origin main
