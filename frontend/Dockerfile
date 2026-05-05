@@ -14,9 +14,7 @@ RUN npm ci
 # ---- Builder stage ----
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/backend/node_modules ./backend/node_modules
 COPY --from=deps /app/frontend/node_modules ./frontend/node_modules
-COPY --from=deps /app/shared/node_modules ./shared/node_modules
 COPY . .
 
 # Build shared package first
