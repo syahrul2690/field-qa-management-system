@@ -1,0 +1,2 @@
+-- Add PIC_CONSULTANT to the Role enum
+ALTER TYPE "Role" ADD VALUE 'PIC_CONSULTANT';

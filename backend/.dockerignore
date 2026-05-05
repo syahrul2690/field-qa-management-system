@@ -1,0 +1,45 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+build/
+
+# Environment files
+.env
+*.env.local
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+npm-debug.log*
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+
+# Uploads (runtime data)
+uploads/
+
+# Tests
+*.test.ts
+*.spec.ts
+__tests__/
+coverage/
+
+# Docs
+*.md
+Business Process Memory/
+Knowledge_Base/
+tasks/
+
+# Prisma migrations SQL are kept, but not needed in backend image
+# (we use prisma migrate deploy or copy schema only)
+prisma/migrations/*.sql
