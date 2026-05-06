@@ -3,6 +3,12 @@ name: Deploy to VPS
 on:
   push:
     branches: [main]
+  workflow_dispatch:
+    inputs:
+      force_build:
+        description: 'Force rebuild both images'
+        type: boolean
+        default: true
 
 env:
   REGISTRY: ghcr.io
@@ -13,8 +19,8 @@ jobs:
     name: Detect Changed Workspaces
     runs-on: ubuntu-latest
     outputs:
-      backend: ${{ steps.changes.outputs.backend }}
-      frontend: ${{ steps.changes.outputs.frontend }}
+      backend: ${{ steps.result.outputs.backend }}
+      frontend: ${{ steps.result.outputs.frontend }}
     steps:
       - uses: actions/checkout@v4
       - uses: dorny/paths-filter@v3
@@ -32,6 +38,17 @@ jobs:
               - 'shared/**'
               - 'package*.json'
               - 'frontend/Dockerfile'
+      - name: Resolve build targets
+        id: result
+        run: |
+          FORCE="${{ github.event.inputs.force_build }}"
+          if [ "$FORCE" = "true" ]; then
+            echo "backend=true" >> $GITHUB_OUTPUT
+            echo "frontend=true" >> $GITHUB_OUTPUT
+          else
+            echo "backend=${{ steps.changes.outputs.backend }}" >> $GITHUB_OUTPUT
+            echo "frontend=${{ steps.changes.outputs.frontend }}" >> $GITHUB_OUTPUT
+          fi
 
   build-backend:
     name: Build & Push Backend
