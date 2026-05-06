@@ -437,7 +437,7 @@ export function DashboardPage() {
   const normalProjects    = projects.filter((p) => p.urgency === 'NORMAL');
 
   return (
-    <div className="space-y-6 max-w-5xl">
+    <div className="space-y-6 w-full">
 
       {/* Summary stats */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">

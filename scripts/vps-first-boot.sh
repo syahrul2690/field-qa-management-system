@@ -157,16 +157,20 @@ fi
 echo -e "${BLUE}▶ Configuring firewall...${NC}"
 
 if command -v ufw &> /dev/null; then
-    if ! sudo ufw status | grep -q "8080/tcp"; then
-        sudo ufw allow 8080/tcp
-        echo -e "  ${GREEN}✓ Port 8080 opened via UFW${NC}"
-    else
-        echo -e "  ${GREEN}✓ Port 8080 already open${NC}"
-    fi
-    sudo ufw status | grep -E "(Status|8080)"
+    # Always ensure SSH is open first to prevent lockout
+    sudo ufw allow 22/tcp
+    echo -e "  ${GREEN}✓ Port 22 (SSH) opened via UFW${NC}"
+
+    sudo ufw allow 8080/tcp
+    echo -e "  ${GREEN}✓ Port 8080 (frontend) opened via UFW${NC}"
+
+    sudo ufw allow 3001/tcp
+    echo -e "  ${GREEN}✓ Port 3001 (backend API) opened via UFW${NC}"
+
+    sudo ufw status | grep -E "(Status|22|8080|3001)"
 else
     echo -e "  ${YELLOW}⚠ UFW not installed. Skipping firewall config.${NC}"
-    echo "  If using another firewall (iptables, firewalld), manually open port 8080."
+    echo "  If using another firewall (iptables, firewalld), manually open ports 22, 8080, 3001."
 fi
 echo
 

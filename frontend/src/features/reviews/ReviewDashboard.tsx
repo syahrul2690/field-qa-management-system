@@ -240,7 +240,7 @@ export function ReviewDashboard() {
     : 'Documents awaiting your review action.';
 
   return (
-    <div className="space-y-8 max-w-5xl">
+    <div className="space-y-8 w-full">
       {/* Page header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">{pageTitle}</h1>

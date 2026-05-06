@@ -25,9 +25,7 @@ services:
       start_period: 10s
 
   backend:
-    build:
-      context: .
-      dockerfile: backend/Dockerfile
+    image: ghcr.io/syahrul2690/field-qa-management-system/backend:latest
     container_name: qa-backend
     restart: unless-stopped
     environment:
@@ -62,9 +60,7 @@ services:
       start_period: 10s
 
   frontend:
-    build:
-      context: .
-      dockerfile: frontend/Dockerfile
+    image: ghcr.io/syahrul2690/field-qa-management-system/frontend:latest
     container_name: qa-frontend
     restart: unless-stopped
     # Map to host port 8080 so it doesn't conflict with your existing nginx on 80
