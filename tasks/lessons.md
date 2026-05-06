@@ -112,3 +112,46 @@ _This file tracks patterns and corrections to prevent repeated mistakes._
   fi
   cd ~/project && git pull origin main
   ```
+
+## Session: 2026-05-06 — VPS Firewall, GHCR Pipeline & Responsive Layout
+
+### Lesson 15: Attaching a cloud security group overrides provider defaults
+- On Biznet Gio (and most cloud providers), VMs with no security group attached allow all traffic by default.
+- The moment you attach a security group, only explicitly listed ports are allowed — everything else is dropped.
+- Rule: Before attaching a security group, list ALL ports used by every app on that server (not just the new one).
+- In this project: attaching a new security group for the QA system (ports 22, 8080, 3001) silently blocked port 80 used by the existing ruptl-dashboard app.
+
+### Lesson 16: Always open port 22 first in any firewall script
+- `vps-first-boot.sh` only opened port 8080 via UFW, not port 22 (SSH).
+- If UFW is active or gets enabled later, SSH access is lost immediately.
+- Rule: Any script that configures UFW must open port 22 **first**, before any other port.
+  ```bash
+  sudo ufw allow 22/tcp   # SSH — always first
+  sudo ufw allow 8080/tcp
+  sudo ufw allow 3001/tcp
+  ```
+
+### Lesson 17: Two firewall layers exist on cloud VPS — both must allow the port
+- Cloud provider security group (network level, outside the VM)
+- UFW / iptables inside the VM (OS level)
+- A port must be open in **both** layers. Opening it in only one layer still blocks traffic.
+- Diagnose which layer is blocking: `nc -zv <ip> <port>` — hangs = cloud firewall; "Connection refused" = reaches VM but OS firewall or service not running.
+
+### Lesson 18: docker compose pull fails if image never existed in registry
+- Switching `docker-compose.prod.yml` from `build:` (local) to `image: ghcr.io/...` requires the image to already exist in GHCR before deploy runs.
+- The CI pipeline must push the image at least once before the VPS can pull it.
+- Rule: When migrating from local builds to registry-based deploys, either:
+  1. Build and push images manually first, OR
+  2. Add a fallback in the pipeline: if neither workspace changed, rebuild both images (handles first deploy).
+
+### Lesson 19: GitHub Actions "Re-run" replays the original event, not workflow_dispatch
+- Clicking "Re-run jobs" in GitHub Actions replays the same push event that originally triggered the run.
+- `github.event.inputs.*` will be empty on a re-run of a push-triggered workflow.
+- Any logic gated on `workflow_dispatch` inputs will silently fall back to defaults.
+- Rule: To trigger `workflow_dispatch` inputs, always use the **"Run workflow"** button on the Actions tab, not "Re-run jobs".
+
+### Lesson 20: Parallel Docker builds in GitHub Actions cut deploy time ~50%
+- Sequential backend + frontend builds: ~14 min total.
+- Parallel builds in separate jobs: ~8 min (longest single build wins).
+- Use separate GHA cache scopes (`scope=backend`, `scope=frontend`) so parallel jobs don't overwrite each other's cache.
+- Only rebuild a service when its workspace files changed (paths-filter); fall back to rebuilding both when no workspace files changed (first deploy / config-only pushes).
