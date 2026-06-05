@@ -121,16 +121,27 @@ jobs:
           command_timeout: 300s
           script: |
             set -e
-            REPO_URL="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/syahrul2690/field-qa-management-system.git"
+
+            # Ensure deploy key and SSH config alias are present on this VPS
+            mkdir -p ~/.ssh
+            chmod 700 ~/.ssh
+            if [ ! -f ~/.ssh/field_qa_deploy ]; then
+              echo "${{ secrets.GH_DEPLOY_KEY }}" > ~/.ssh/field_qa_deploy
+              chmod 600 ~/.ssh/field_qa_deploy
+            fi
+            ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
+            if ! grep -q "Host github-field-qa" ~/.ssh/config 2>/dev/null; then
+              printf '\nHost github-field-qa\n  HostName github.com\n  User git\n  IdentityFile ~/.ssh/field_qa_deploy\n  StrictHostKeyChecking no\n' >> ~/.ssh/config
+              chmod 600 ~/.ssh/config
+            fi
 
             # Clone repo on first run
             if [ ! -d ~/field-qa-management-system ]; then
               cd ~
-              git clone "$REPO_URL" field-qa-management-system
+              git clone git@github-field-qa:syahrul2690/field-qa-management-system.git field-qa-management-system
             fi
 
             cd ~/field-qa-management-system
-            git remote set-url origin "$REPO_URL"
             git pull origin main
 
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
