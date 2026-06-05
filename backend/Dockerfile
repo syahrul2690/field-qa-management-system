@@ -36,7 +36,6 @@ RUN apk add --no-cache openssl curl
 # Copy built artifacts
 COPY --from=builder /app/backend/dist ./dist
 COPY --from=builder /app/backend/prisma ./prisma
-COPY --from=builder /app/backend/node_modules ./node_modules
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/package*.json ./
 
