@@ -142,6 +142,7 @@ jobs:
             fi
 
             cd ~/field-qa-management-system
+            git remote set-url origin git@github-field-qa:syahrul2690/field-qa-management-system.git
             git pull origin main
 
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
