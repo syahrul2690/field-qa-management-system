@@ -124,7 +124,7 @@ jobs:
 
             # Write GitHub deploy key
             mkdir -p ~/.ssh && chmod 700 ~/.ssh
-            echo "${{ secrets.GH_DEPLOY_KEY }}" > ~/.ssh/field_qa_deploy
+            echo "${{ secrets.GH_DEPLOY_KEY }}" | base64 -d > ~/.ssh/field_qa_deploy
             chmod 600 ~/.ssh/field_qa_deploy
             echo "=== Deploy key fingerprint on VPS ==="
             ssh-keygen -l -f ~/.ssh/field_qa_deploy
