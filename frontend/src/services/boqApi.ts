@@ -12,4 +12,5 @@ export const boqApi = {
     });
   },
   clear: (projectId: string) => apiClient.delete(`/projects/${projectId}/boq`),
+  downloadTemplate: () => apiClient.get('/boq/template', { responseType: 'blob' }),
 };

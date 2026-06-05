@@ -5,6 +5,16 @@ import { useUIStore } from '../../store/uiStore';
 import { Modal } from '../../components/ui/Modal';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 
+async function handleTemplateDownload() {
+  const res = await boqApi.downloadTemplate();
+  const url = URL.createObjectURL(new Blob([res.data]));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'boq_template.xlsx';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 interface BoqUploadModalProps {
   isOpen: boolean;
   onClose: () => void;
@@ -112,6 +122,23 @@ export function BoqUploadModal({ isOpen, onClose, projectId }: BoqUploadModalPro
               <p className="text-xs text-gray-500 mt-1">or click to browse — .xlsx or .xls only</p>
             </div>
           )}
+        </div>
+
+        {/* Template download hint */}
+        <div className="flex items-center gap-2 text-sm text-gray-500">
+          <svg className="h-4 w-4 text-gray-400 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+          </svg>
+          <span>
+            Don't have the format?{' '}
+            <button
+              type="button"
+              onClick={handleTemplateDownload}
+              className="text-primary-600 hover:text-primary-700 font-medium underline underline-offset-2"
+            >
+              Download example template
+            </button>
+          </span>
         </div>
 
         {/* Validation errors */}

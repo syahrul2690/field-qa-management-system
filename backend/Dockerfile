@@ -5,18 +5,17 @@ RUN apk add --no-cache libc6-compat
 
 # ---- Dependencies stage ----
 FROM base AS deps
-# Copy root and workspace manifests
+# Only copy manifests needed for backend + shared (skip frontend)
 COPY package*.json ./
 COPY backend/package*.json backend/
-COPY frontend/package*.json frontend/
 COPY shared/package*.json shared/
-# Install all workspace dependencies (hoisted to root)
+# Create empty frontend package.json so npm workspaces doesn't complain
+RUN mkdir -p frontend && echo '{"name":"@qa-system/frontend","version":"0.0.0","private":true}' > frontend/package.json
 RUN npm ci
 
 # ---- Builder stage ----
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/backend/node_modules ./backend/node_modules
 COPY . .
 
 # Build shared package first (backend depends on it)

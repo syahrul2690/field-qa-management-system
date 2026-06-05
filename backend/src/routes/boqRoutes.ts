@@ -38,5 +38,7 @@ boqProjectRoutes.delete(
 
 export const boqItemRoutes = Router();
 
+// Must be before /:itemId to avoid route shadowing
+boqItemRoutes.get('/template', authenticate, boqController.downloadTemplate);
 boqItemRoutes.get('/:itemId', authenticate, boqController.getBoqItem);
 boqItemRoutes.get('/:itemId/children', authenticate, boqController.getBoqItemChildren);
