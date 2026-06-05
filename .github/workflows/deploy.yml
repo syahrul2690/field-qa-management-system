@@ -126,7 +126,7 @@ jobs:
             mkdir -p ~/.ssh
             chmod 700 ~/.ssh
             if [ ! -f ~/.ssh/field_qa_deploy ]; then
-              echo "${{ secrets.VPS_SSH_KEY }}" > ~/.ssh/field_qa_deploy
+              echo "${{ secrets.GH_DEPLOY_KEY }}" > ~/.ssh/field_qa_deploy
               chmod 600 ~/.ssh/field_qa_deploy
             fi
             ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
