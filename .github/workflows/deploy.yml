@@ -122,25 +122,23 @@ jobs:
           script: |
             set -e
 
-            # Ensure deploy key and SSH config alias are present on this VPS
-            mkdir -p ~/.ssh
-            chmod 700 ~/.ssh
+            # Write GitHub deploy key
+            mkdir -p ~/.ssh && chmod 700 ~/.ssh
             echo "${{ secrets.GH_DEPLOY_KEY }}" > ~/.ssh/field_qa_deploy
             chmod 600 ~/.ssh/field_qa_deploy
             ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
-            if ! grep -q "Host github-field-qa" ~/.ssh/config 2>/dev/null; then
-              printf '\nHost github-field-qa\n  HostName github.com\n  User git\n  IdentityFile ~/.ssh/field_qa_deploy\n  StrictHostKeyChecking no\n' >> ~/.ssh/config
-              chmod 600 ~/.ssh/config
-            fi
+
+            # Use explicit key for all git operations — no SSH config alias needed
+            export GIT_SSH_COMMAND="ssh -i ~/.ssh/field_qa_deploy -o StrictHostKeyChecking=no"
 
             # Clone repo on first run
             if [ ! -d ~/field-qa-management-system ]; then
               cd ~
-              git clone git@github-field-qa:syahrul2690/field-qa-management-system.git field-qa-management-system
+              git clone git@github.com:syahrul2690/field-qa-management-system.git field-qa-management-system
             fi
 
             cd ~/field-qa-management-system
-            git remote set-url origin git@github-field-qa:syahrul2690/field-qa-management-system.git
+            git remote set-url origin git@github.com:syahrul2690/field-qa-management-system.git
             git pull origin main
 
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
