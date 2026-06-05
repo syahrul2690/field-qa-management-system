@@ -125,10 +125,8 @@ jobs:
             # Ensure deploy key and SSH config alias are present on this VPS
             mkdir -p ~/.ssh
             chmod 700 ~/.ssh
-            if [ ! -f ~/.ssh/field_qa_deploy ]; then
-              echo "${{ secrets.GH_DEPLOY_KEY }}" > ~/.ssh/field_qa_deploy
-              chmod 600 ~/.ssh/field_qa_deploy
-            fi
+            echo "${{ secrets.GH_DEPLOY_KEY }}" > ~/.ssh/field_qa_deploy
+            chmod 600 ~/.ssh/field_qa_deploy
             ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
             if ! grep -q "Host github-field-qa" ~/.ssh/config 2>/dev/null; then
               printf '\nHost github-field-qa\n  HostName github.com\n  User git\n  IdentityFile ~/.ssh/field_qa_deploy\n  StrictHostKeyChecking no\n' >> ~/.ssh/config
