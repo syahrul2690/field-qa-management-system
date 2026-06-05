@@ -121,14 +121,16 @@ jobs:
           command_timeout: 300s
           script: |
             set -e
+            REPO_URL="https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/syahrul2690/field-qa-management-system.git"
 
             # Clone repo on first run
             if [ ! -d ~/field-qa-management-system ]; then
               cd ~
-              git clone git@github-field-qa:syahrul2690/field-qa-management-system.git field-qa-management-system
+              git clone "$REPO_URL" field-qa-management-system
             fi
 
             cd ~/field-qa-management-system
+            git remote set-url origin "$REPO_URL"
             git pull origin main
 
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
