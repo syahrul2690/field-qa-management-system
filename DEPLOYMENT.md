@@ -6,6 +6,44 @@ Local → GitHub → VPS deployment workflow for `field-qa-management-system`.
 
 ---
 
+## 🖥️ Connect to VPS
+
+SSH alias `qa-vps` is configured in `~/.ssh/config` on the local machine:
+
+```bash
+ssh qa-vps
+```
+
+| Field | Value |
+|---|---|
+| Alias | `qa-vps` |
+| Host | `103.93.161.157` |
+| User | `pusmanpro` |
+| Key | `~/.ssh/ruptl-dashboard.pem` |
+
+> `develop4.pem` is the original Biznet Gio key name for this VPS but is not present on this machine. Use `ruptl-dashboard.pem` — it's the same key and already works.
+
+**Useful one-liners (no need to SSH in manually):**
+
+```bash
+# Check all QA containers
+ssh qa-vps "docker ps --filter name=qa-"
+
+# Tail backend logs
+ssh qa-vps "docker logs qa-backend --tail 50"
+
+# Tail frontend logs
+ssh qa-vps "docker logs qa-frontend --tail 20"
+
+# Restart backend (e.g. after .env change)
+ssh qa-vps "docker compose -f ~/field-qa-management-system/docker-compose.prod.yml restart backend"
+
+# Full restart all containers
+ssh qa-vps "cd ~/field-qa-management-system && docker compose -f docker-compose.prod.yml restart"
+```
+
+---
+
 ## 🚀 How to Deploy (Normal Flow)
 
 Just push to `main` — CI does the rest automatically:
