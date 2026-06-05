@@ -6,17 +6,35 @@ Local → GitHub → VPS deployment workflow for `field-qa-management-system`.
 
 ---
 
+## 🚀 How to Deploy (Normal Flow)
+
+Just push to `main` — CI does the rest automatically:
+
+```bash
+git add <files>
+git commit -m "your message"
+git push origin main
+```
+
+To trigger a deploy manually without a code change:
+- Go to **GitHub → Actions → Deploy to VPS → Run workflow → Run workflow**
+
+**Pipeline completes in ~8–10 min.** App live at: `http://103.93.161.157:8080`
+
+---
+
 ## Infrastructure
 
 | Item | Value |
 |---|---|
-| VPS IP | `YOUR_VPS_IP` *(replace with actual)* |
-| VPS user | `pusmanpro` *(replace with actual)* |
-| SSH key | `~/.ssh/field-qa.pem` *(replace with actual)* |
+| VPS IP | `103.93.161.157` |
+| VPS user | `pusmanpro` |
+| VPS SSH key | `VPS_SSH_KEY` secret (Biznet Gio `.pem`) |
 | Project path on VPS | `~/field-qa-management-system` |
-| GitHub repo | `YOUR_USERNAME/field-qa-management-system` *(replace with actual)* |
+| GitHub repo | `syahrul2690/field-qa-management-system` |
+| Container registry | `ghcr.io/syahrul2690/field-qa-management-system` |
 | Main branch | `main` |
-| Access URL | `http://YOUR_VPS_IP:8080` |
+| Access URL | `http://103.93.161.157:8080` |
 
 ---
 
@@ -162,46 +180,32 @@ The backend is healthy when the logs end with:
 
 ## GitHub Actions Auto-Deploy
 
-Create `.github/workflows/deploy.yml` to auto-deploy on every push to `main`.
+The pipeline is live and fully configured. Every push to `main` triggers it automatically.
 
-### Required Repository Secrets
+### How the Pipeline Works
 
-Go to: **GitHub repo → Settings → Secrets and variables → Actions → New repository secret**
-
-Choose **Repository secret**, then add each one:
-
-| Secret Name | Value |
-|---|---|
-| `VPS_HOST` | Your VPS IP address |
-| `VPS_USER` | Your VPS SSH username |
-| `VPS_SSH_KEY` | Full contents of your `.pem` private key (include `-----BEGIN/END-----` lines) |
-
-### Example `deploy.yml`
-
-```yaml
-name: Deploy to VPS
-
-on:
-  push:
-    branches: [main]
-
-jobs:
-  deploy:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Deploy to VPS
-        uses: appleboy/ssh-action@v1.0.0
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          script: |
-            cd ~/field-qa-management-system
-            git pull origin main
-            docker compose -f docker-compose.prod.yml build --no-cache backend frontend
-            docker compose -f docker-compose.prod.yml up -d
-            docker image prune -f
 ```
+push to main
+  │
+  ├── detect-changes        which workspace changed? (backend/frontend/both)
+  ├── build-backend ──────▶ ghcr.io/.../backend:latest
+  ├── build-frontend ─────▶ ghcr.io/.../frontend:latest
+  └── deploy
+        ├── SCP docker-compose.prod.yml ──▶ VPS ~/field-qa-management-system/
+        └── SSH: docker compose pull && docker compose up -d
+```
+
+> **Design decision:** The VPS pulls pre-built images from GHCR — it does NOT clone or pull from GitHub. Only `docker-compose.prod.yml` is copied via SCP. This avoids all git-on-VPS complexity.
+
+### Required Repository Secrets (already configured ✅)
+
+| Secret | Purpose |
+|---|---|
+| `VPS_HOST` | VPS IP — `103.93.161.157` |
+| `VPS_USER` | VPS username — `pusmanpro` |
+| `VPS_SSH_KEY` | Private key to SSH into VPS (Biznet Gio `.pem`) |
+
+> ⚠️ Do NOT add a `GH_DEPLOY_KEY` — it is not needed and caused issues. The VPS never accesses GitHub directly.
 
 ---
 

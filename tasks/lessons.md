@@ -155,3 +155,24 @@ _This file tracks patterns and corrections to prevent repeated mistakes._
 - Parallel builds in separate jobs: ~8 min (longest single build wins).
 - Use separate GHA cache scopes (`scope=backend`, `scope=frontend`) so parallel jobs don't overwrite each other's cache.
 - Only rebuild a service when its workspace files changed (paths-filter); fall back to rebuilding both when no workspace files changed (first deploy / config-only pushes).
+
+## Session: 2026-06-05 — Deploy Pipeline SSH Debugging
+
+### Lesson 21: Never use git-on-VPS for image-based deploys — use SCP instead
+- Trying to `git pull` on the VPS requires the VPS to authenticate to GitHub via a separate SSH deploy key.
+- Storing a multiline SSH private key in GitHub Actions secrets and writing it to the VPS is unreliable:
+  - Inline script expansion (`${{ secrets.KEY }}`) can corrupt newlines
+  - `echo` and `base64 -d` failures are common across platforms
+  - Even the `envs:` param in appleboy/ssh-action doesn't guarantee the right key was pasted
+- **The correct pattern for image-based deploys:**
+  1. Build images in CI → push to GHCR
+  2. Copy only `docker-compose.prod.yml` to VPS via `appleboy/scp-action` (reuses `VPS_SSH_KEY`)
+  3. SSH in and run `docker compose pull && docker compose up -d`
+  4. The VPS never needs git, deploy keys, or GitHub access at all
+- This uses only the 3 secrets already needed: `VPS_HOST`, `VPS_USER`, `VPS_SSH_KEY`
+
+### Lesson 22: When a key fingerprint never matches after multiple attempts — redesign
+- If the fingerprint on the VPS consistently doesn't match the expected one, the user is pasting the wrong key each time.
+- Do not keep iterating on the same approach (raw paste → base64 → envs).
+- Instead, redesign to eliminate the problematic secret entirely.
+- In this project: replaced git-on-VPS with SCP of compose file — `GH_DEPLOY_KEY` secret no longer needed.
