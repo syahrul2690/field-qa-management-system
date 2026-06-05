@@ -126,6 +126,8 @@ jobs:
             mkdir -p ~/.ssh && chmod 700 ~/.ssh
             echo "${{ secrets.GH_DEPLOY_KEY }}" > ~/.ssh/field_qa_deploy
             chmod 600 ~/.ssh/field_qa_deploy
+            echo "=== Deploy key fingerprint on VPS ==="
+            ssh-keygen -l -f ~/.ssh/field_qa_deploy
             ssh-keyscan -t ed25519 github.com >> ~/.ssh/known_hosts 2>/dev/null
 
             # Use explicit key for all git operations — no SSH config alias needed
