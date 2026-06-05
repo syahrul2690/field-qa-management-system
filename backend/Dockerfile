@@ -16,6 +16,8 @@ RUN npm ci
 # ---- Builder stage ----
 FROM base AS builder
 COPY --from=deps /app/node_modules ./node_modules
+# Copy workspace-level packages that npm didn't hoist (e.g. pdf-parse)
+COPY --from=deps /app/backend/node_modules ./backend/node_modules
 COPY . .
 
 # Build shared package first (backend depends on it)
@@ -36,7 +38,9 @@ RUN apk add --no-cache openssl curl
 # Copy built artifacts
 COPY --from=builder /app/backend/dist ./dist
 COPY --from=builder /app/backend/prisma ./prisma
+# Root node_modules first, then merge workspace-level packages on top
 COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/backend/node_modules ./node_modules
 COPY --from=builder /app/package*.json ./
 
 # Uploads volume mount point
