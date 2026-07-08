@@ -2,6 +2,7 @@ import { prisma } from '../config/database';
 import { AppError } from '../utils/AppError';
 import { DocumentSection, ReviewStatus } from '@prisma/client';
 import { storeDocumentFile } from './fileStorageService';
+import { submitForReview } from './reviewService';
 
 // ─── Input Interfaces ─────────────────────────────────────────────────────────
 
@@ -125,7 +126,14 @@ export async function createDocument(
     });
   });
 
-  return document;
+  // Immediately submit the freshly uploaded document for review, so it never
+  // sits invisible to reviewers in a DRAFT state the vendor forgot to submit.
+  await submitForReview(document!.id, uploaded_by);
+
+  return prisma.document.findUnique({
+    where: { id: document!.id },
+    include: { files: true },
+  });
 }
 
 // ─── Create Revision ──────────────────────────────────────────────────────────
@@ -218,7 +226,13 @@ export async function createRevision(
     });
   });
 
-  return newDocument;
+  // Immediately submit the new revision for review, same as a first-time upload.
+  await submitForReview(newDocument!.id, uploaded_by);
+
+  return prisma.document.findUnique({
+    where: { id: newDocument!.id },
+    include: { files: true },
+  });
 }
 
 // ─── List Documents ───────────────────────────────────────────────────────────

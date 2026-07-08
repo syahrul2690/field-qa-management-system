@@ -1,38 +1,12 @@
 import { useState } from 'react';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { documentApi } from '../../services/documentApi';
-import { reviewApi } from '../../services/reviewApi';
 import { useAuthStore } from '../../store/authStore';
-import { useUIStore } from '../../store/uiStore';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { DocumentUploadForm } from '../documents/DocumentUploadForm';
 import { DocumentDetailModal } from '../documents/DocumentDetailModal';
 import { DocumentReviseForm } from '../documents/DocumentReviseForm';
-
-function SubmitReviewButton({ documentId, boqItemId, section }: { documentId: string; boqItemId: string; section: string }) {
-  const queryClient = useQueryClient();
-  const { addToast } = useUIStore();
-  const submitMutation = useMutation({
-    mutationFn: () => reviewApi.submit(documentId),
-    onSuccess: () => {
-      addToast('success', 'Document submitted for review.');
-      queryClient.invalidateQueries({ queryKey: ['documents', boqItemId, section] });
-    },
-    onError: () => addToast('error', 'Failed to submit document. Ensure all prerequisites are met.'),
-  });
-
-  return (
-    <button
-      onClick={() => submitMutation.mutate()}
-      disabled={submitMutation.isPending}
-      className="btn-primary text-xs py-1 px-3 flex items-center gap-1.5"
-    >
-      {submitMutation.isPending ? <LoadingSpinner size="sm" /> : null}
-      Submit for Review
-    </button>
-  );
-}
 
 interface BoqItem {
   id: string;
@@ -198,16 +172,6 @@ export function BoqItemDetailPanel({ item, onClose }: BoqItemDetailPanelProps) {
                         </svg>
                         Revise & Resubmit
                       </button>
-                    </div>
-                  )}
-
-                  {/* Submit for first review for DRAFT */}
-                  {isVendor && doc.status === 'DRAFT' && (
-                    <div
-                      className="flex justify-end border-t border-gray-100 pt-3"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <SubmitReviewButton documentId={doc.id} boqItemId={item.id} section={activeSection} />
                     </div>
                   )}
                 </div>

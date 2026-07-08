@@ -25,8 +25,8 @@ export function DocumentUploadForm({ isOpen, onClose, boqItemId, section }: Docu
   const uploadMutation = useMutation({
     mutationFn: (fd: FormData) => documentApi.upload(fd),
     onSuccess: () => {
-      addToast('success', 'Document uploaded successfully.');
-      queryClient.invalidateQueries({ queryKey: ['documents', boqItemId] });
+      addToast('success', 'Document uploaded and submitted for review.');
+      queryClient.invalidateQueries({ queryKey: ['documents', boqItemId, section] });
       handleClose();
     },
     onError: (err: unknown) => {
