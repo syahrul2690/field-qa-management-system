@@ -124,7 +124,7 @@ function CommentSheetPanel({ reviewId, review, canEdit, role }: CommentSheetPane
   const { addToast } = useUIStore();
   const queryClient = useQueryClient();
 
-  const { data: itemsData, isLoading } = useQuery({
+  const { data: itemsData, isLoading, isError, refetch } = useQuery({
     queryKey: ['comment-sheet-items', reviewId],
     queryFn: () => reviewApi.getCommentSheetItems(reviewId),
   });
@@ -138,7 +138,7 @@ function CommentSheetPanel({ reviewId, review, canEdit, role }: CommentSheetPane
   // Sync server → local only when data actually arrives (itemsData defined + not loading).
   // Skip if the user has unsaved edits in progress.
   useEffect(() => {
-    if (isLoading || itemsData === undefined) return;
+    if (isLoading || isError || itemsData === undefined) return;
     if (dirty) return;
     const serverItems: CommentSheetItem[] = itemsData?.data?.data ?? [];
     setLocalItems(
@@ -150,7 +150,7 @@ function CommentSheetPanel({ reviewId, review, canEdit, role }: CommentSheetPane
           }))
         : [{ seq_no: 1, pln_comment: '', contractor_response: '' }],
     );
-  }, [itemsData, isLoading]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [itemsData, isLoading, isError]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const saveMutation = useMutation({
     mutationFn: () =>
@@ -237,7 +237,14 @@ function CommentSheetPanel({ reviewId, review, canEdit, role }: CommentSheetPane
       </div>
 
       {/* Items table — spinner until localItems is populated from server */}
-      {localItems === null ? (
+      {isError ? (
+        <div className="py-8 flex flex-col items-center gap-3">
+          <p className="text-sm text-red-600">Failed to load the comment sheet.</p>
+          <button onClick={() => refetch()} className="btn-secondary text-xs py-1.5 px-3">
+            Retry
+          </button>
+        </div>
+      ) : localItems === null ? (
         <div className="py-8 flex justify-center"><LoadingSpinner /></div>
       ) : (
         <div className="overflow-x-auto">
