@@ -146,8 +146,12 @@ export async function addReviewerAndComments(
     throw new AppError('Review is not in REVIEW stage', 400);
   }
 
-  // If a reviewer is pre-assigned (by PIC_CONSULTANT), only that reviewer may submit
-  if (review.reviewer_id && review.reviewer_id !== actorId) {
+  // A reviewer must be assigned by PIC_CONSULTANT before anyone can submit —
+  // and only that assigned reviewer may submit (staged workflow, no self-claim).
+  if (!review.reviewer_id) {
+    throw new AppError('No reviewer has been assigned to this review yet.', 403);
+  }
+  if (review.reviewer_id !== actorId) {
     throw new AppError('This review is assigned to a different reviewer.', 403);
   }
 
@@ -475,7 +479,7 @@ export async function saveCommentSheetItems(
   }
 
   // Validate ownership: reviewer must be assigned, checker must be assigned
-  if (actorRole === Role.REVIEWER && review.reviewer_id && review.reviewer_id !== actorId) {
+  if (actorRole === Role.REVIEWER && review.reviewer_id !== actorId) {
     throw new AppError('You are not the assigned reviewer for this review', 403);
   }
   if (actorRole === Role.CHECKER && review.checker_id !== actorId) {
@@ -735,12 +739,12 @@ export async function getPendingReviews(
     // PIC roles see all reviews not yet assigned a reviewer
     activeWhereClause = { final_status: null, reviewer_id: null };
   } else if (actorRole === Role.REVIEWER) {
+    // Reviewer only sees reviews PIC_CONSULTANT has explicitly assigned to them —
+    // unassigned reviews are not visible until assignment (staged workflow).
     activeWhereClause = {
       final_status: null,
-      OR: [
-        { reviewer_id: null },
-        { reviewer_id: actorId, reviewed_at: null },
-      ],
+      reviewer_id: actorId,
+      reviewed_at: null,
     };
   } else if (actorRole === Role.CHECKER) {
     activeWhereClause = {
@@ -944,13 +948,13 @@ export async function getNotifications(
   }
 
   if (actorRole === Role.REVIEWER) {
+    // Only notify once PIC_CONSULTANT has explicitly assigned this reviewer —
+    // unassigned reviews must not surface for every reviewer (staged workflow).
     const pending = await prisma.documentReview.findMany({
       where: {
         final_status: null,
-        OR: [
-          { reviewer_id: null },
-          { reviewer_id: actorId, reviewed_at: null },
-        ],
+        reviewer_id: actorId,
+        reviewed_at: null,
       },
       include: docInclude,
       orderBy: { sla_deadline: 'asc' },
@@ -959,10 +963,8 @@ export async function getNotifications(
       notifications.push({
         id: `action-${r.id}`,
         type: r.sla_deadline && new Date() > r.sla_deadline ? 'OVERDUE' : 'ACTION_REQUIRED',
-        title: r.reviewer_id === actorId ? 'Review in progress' : 'New document awaiting review',
-        body: r.reviewer_id === actorId
-          ? `Please complete your review comments for "${r.document?.title ?? ''}".`
-          : `A document has been submitted and needs a reviewer. Click to claim it.`,
+        title: 'Review required',
+        body: `You have been assigned to review "${r.document?.title ?? ''}".`,
         ...buildBase(r),
       });
     }
