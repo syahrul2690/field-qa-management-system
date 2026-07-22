@@ -11,6 +11,10 @@ import { router } from './routes';
 export function createApp(): express.Application {
   const app = express();
 
+  // Trust the reverse proxy chain (host nginx -> frontend container nginx) so
+  // express-rate-limit reads the real client IP from X-Forwarded-For instead of rejecting it.
+  app.set('trust proxy', 2);
+
   // Security headers
   app.use(helmet());
 
