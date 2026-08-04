@@ -15,6 +15,17 @@ const mockPrisma = vi.hoisted(() => {
 
 vi.mock('../config/database', () => ({ prisma: mockPrisma }));
 
+// reviewService.ts (transitively, via slaService.ts) imports `config` from
+// '../config', which reads required env vars (DATABASE_URL, JWT secrets) at
+// module-load time and throws if they're unset. There's no .env file in CI,
+// so this must be mocked here the same way authService.test.ts does it.
+vi.mock('../config', () => ({
+  config: {
+    sla: { defaultDays: 7 },
+    integration: { apiKey: '' },
+  },
+}));
+
 // Avoid pulling in unrelated modules (pdf-lib, qrcode, etc.) transitively
 // required only by other exports of reviewService.
 vi.mock('../utils/pdfEngine/commentSheetGenerator', () => ({
