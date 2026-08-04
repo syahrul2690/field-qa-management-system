@@ -36,4 +36,21 @@ export const reviewApi = {
     reviewId: string,
     items: Array<{ seq_no: number; pln_comment: string; contractor_response?: string }>,
   ) => apiClient.put(`/reviews/${reviewId}/comment-sheet-items`, { items }),
+  getItpItems: (documentId: string) =>
+    apiClient.get(`/documents/${documentId}/itp-items`),
+  saveItpItems: (
+    documentId: string,
+    items: Array<{
+      seq_no: number;
+      activity: string;
+      acceptance_criteria?: string;
+      reference_standard?: string;
+      verifying_document?: string;
+      sub_code?: string;
+      pp_code?: string;
+      pln_code?: string;
+      phase?: string;
+      category: string;
+    }>,
+  ) => apiClient.put(`/documents/${documentId}/itp-items`, { items }),
 };

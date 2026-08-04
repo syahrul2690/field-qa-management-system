@@ -93,6 +93,14 @@ export function AppLayout() {
     (i) => location.pathname === i.path || location.pathname.startsWith(i.path + '/')
   );
 
+  // Routes that are reachable but intentionally not in the sidebar nav (e.g.
+  // linked from the user menu, not a primary section) still need a real
+  // header title instead of falling back to the app brand name.
+  const NON_NAV_TITLES: Record<string, string> = {
+    '/profile': 'My Profile',
+  };
+  const pageTitle = activeNav?.label ?? NON_NAV_TITLES[location.pathname] ?? 'Pusat Manajemen Proyek';
+
   const SidebarContent = () => (
     <div className="flex flex-col h-full" style={{ background: 'linear-gradient(180deg, #0e4f65 0%, #0a3d50 100%)' }}>
 
@@ -224,7 +232,7 @@ export function AppLayout() {
           </button>
 
           <h1 className="text-base font-semibold text-gray-800">
-            {activeNav?.label ?? 'Pusat Manajemen Proyek'}
+            {pageTitle}
           </h1>
 
           <div className="flex-1" />

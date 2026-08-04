@@ -35,9 +35,13 @@ __tests__/
 coverage/
 
 # Docs
+# NOTE: Knowledge_Base/ is intentionally NOT excluded — the backend reads it at
+# runtime for AI-assisted review (see knowledgeBaseService.ts). It lives at the
+# repo root, not under backend/, so this file only matters if this Dockerfile is
+# ever built with context=backend/ directly; the root .dockerignore is what
+# governs the actual `context: .` build used by docker-compose.
 *.md
 Business Process Memory/
-Knowledge_Base/
 tasks/
 
 # Prisma migrations SQL are kept, but not needed in backend image

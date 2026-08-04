@@ -8,6 +8,7 @@ import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 const ALL_ROLES = [
   'ADMIN',
   'PIC_PROJECT',
+  'PIC_CONSULTANT',
   'VENDOR',
   'REVIEWER',
   'CHECKER',
@@ -18,6 +19,7 @@ const ALL_ROLES = [
 const ROLE_LABELS: Record<string, string> = {
   ADMIN: 'Admin',
   PIC_PROJECT: 'PIC Project',
+  PIC_CONSULTANT: 'PIC Consultant',
   VENDOR: 'Vendor',
   REVIEWER: 'Reviewer',
   CHECKER: 'Checker',

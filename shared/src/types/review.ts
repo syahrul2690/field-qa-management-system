@@ -54,3 +54,39 @@ export interface VerifyQRResponse {
   approver_name: string;
   project_name: string;
 }
+
+// PLN hold-point authority codes. A single ITP row carries a different code per
+// responsible party (Sub / PP / PLN) — see ItpItemResponse.sub_code etc.
+export type InspectionLevel = 'H' | 'W' | 'SW' | 'R' | 'A' | 'P';
+export type ItpPhase = 'SHOP' | 'FIELD' | 'COMMISSIONING';
+export type ItpCategory = 'SIPIL' | 'ELEKTRIKAL' | 'MEKANIKAL' | 'INSTRUMEN_KONTROL';
+
+export interface ItpItemResponse {
+  id: string;
+  document_id: string;
+  seq_no: number;
+  activity: string;
+  acceptance_criteria: string | null;
+  reference_standard: string | null;
+  verifying_document: string | null;
+  sub_code: InspectionLevel | null;
+  pp_code: InspectionLevel | null;
+  pln_code: InspectionLevel | null;
+  phase: ItpPhase;
+  category: ItpCategory;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface ItpItemInput {
+  seq_no: number;
+  activity: string;
+  acceptance_criteria?: string;
+  reference_standard?: string;
+  verifying_document?: string;
+  sub_code?: InspectionLevel;
+  pp_code?: InspectionLevel;
+  pln_code?: InspectionLevel;
+  phase?: ItpPhase;
+  category: ItpCategory;
+}

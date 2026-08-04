@@ -40,6 +40,19 @@ export const config = {
     defaultDays: parseInt(process.env.DEFAULT_SLA_DAYS ?? '7', 10),
   },
 
+  integration: {
+    apiKey: process.env.INTEGRATION_API_KEY ?? '',
+  },
+
+  knowledgeBase: {
+    // In local dev, __dirname is backend/src/config → three levels up is the repo
+    // root, where Knowledge_Base/ lives. In the Docker production image there is no
+    // such repo root, so KNOWLEDGE_BASE_DIR must be set explicitly (see Dockerfile).
+    dir: process.env.KNOWLEDGE_BASE_DIR
+      ? path.resolve(process.env.KNOWLEDGE_BASE_DIR)
+      : path.resolve(__dirname, '../../../Knowledge_Base'),
+  },
+
   ai: {
     openRouterKey: process.env.OPENROUTER_API_KEY ?? '',
     model: process.env.AI_MODEL ?? 'qwen/qwen3-235b-a22b',

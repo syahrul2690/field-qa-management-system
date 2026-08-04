@@ -16,6 +16,12 @@ interface DocumentReviseFormProps {
   defaultTitle?: string;
 }
 
+const SECTION_LABEL: Record<string, string> = {
+  FIELD_ITP: 'Field ITP',
+  PROCEDURE: 'Procedure',
+  WORK_METHOD: 'Work Method',
+};
+
 export function DocumentReviseForm({
   isOpen,
   onClose,
@@ -106,7 +112,7 @@ export function DocumentReviseForm({
 
         <div>
           <label className="label">Section</label>
-          <input type="text" value={section} disabled className="input bg-gray-50 text-gray-500" />
+          <input type="text" value={SECTION_LABEL[section] ?? section} disabled className="input bg-gray-50 text-gray-500" />
         </div>
 
         <div>

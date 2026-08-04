@@ -230,7 +230,13 @@ export const me = asyncHandler(async (req: Request, res: Response) => {
   }
 
   // Exclude sensitive fields from response
-  const { password_hash: _omit, refresh_token: _rt, ...safeUser } = user;
+  const {
+    password_hash: _omit,
+    refresh_token: _rt,
+    refresh_token_expires: _rte,
+    approved_by: _ab,
+    ...safeUser
+  } = user;
 
   res.json({
     success: true,

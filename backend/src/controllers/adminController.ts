@@ -1,5 +1,5 @@
 import { Request, Response } from 'express';
-import { UserStatus, Role } from '@prisma/client';
+import { UserStatus, Role, QcRole } from '@prisma/client';
 import { asyncHandler } from '../utils/asyncHandler';
 import { AppError } from '../utils/AppError';
 import { listPendingUsers, updateUserStatus, findUserById } from '../services/userService';
@@ -71,11 +71,12 @@ export const suspendUser = asyncHandler(async (req: Request, res: Response) => {
 // PATCH /admin/users/:id — edit user properties (name, role, institution, unit)
 export const updateUserProperties = asyncHandler(async (req: Request, res: Response) => {
   const { id } = req.params;
-  const { name, role, institution_id, unit_id } = req.body as {
+  const { name, role, institution_id, unit_id, qc_role } = req.body as {
     name?: string;
     role?: string;
     institution_id?: string;
     unit_id?: string;
+    qc_role?: string | null;
   };
 
   const user = await findUserById(id);
@@ -84,6 +85,11 @@ export const updateUserProperties = asyncHandler(async (req: Request, res: Respo
   // Validate role
   if (role !== undefined && !Object.values(Role).includes(role as Role)) {
     throw new AppError(`Invalid role: ${role}`, 400);
+  }
+
+  // Validate qc_role (null to clear, or a valid QcRole value)
+  if (qc_role !== undefined && qc_role !== null && !Object.values(QcRole).includes(qc_role as QcRole)) {
+    throw new AppError(`Invalid qc_role: ${qc_role}`, 400);
   }
 
   // Validate institution exists
@@ -109,6 +115,7 @@ export const updateUserProperties = asyncHandler(async (req: Request, res: Respo
       ...(role          !== undefined && { role: role as Role }),
       ...(institution_id !== undefined && { institution_id }),
       ...(unit_id       !== undefined && { unit_id }),
+      ...(qc_role      !== undefined && { qc_role: qc_role === null ? null : qc_role as QcRole }),
     },
     include: {
       institution: { select: { id: true, name: true, type: true } },

@@ -453,6 +453,7 @@ export async function analyzeDocument(
           project: true,
         },
       },
+      itp_items: { select: { category: true } },
     },
   });
 
@@ -512,7 +513,16 @@ export async function analyzeDocument(
     2,
   );
 
-  const systemPrompt = DOCUMENT_SYSTEM_PROMPT + getKnowledgeBaseSection();
+  // Route to the relevant ITP domain files (see knowledgeBaseService) using
+  // whatever text hints the document/BOQ context and its ITP items give us.
+  const kbContext = {
+    text: [document.title, document.boq_item.title, document.boq_item.system_tag, document.section]
+      .filter(Boolean)
+      .join(' '),
+    categories: [...new Set(document.itp_items.map((i) => i.category))],
+  };
+
+  const systemPrompt = DOCUMENT_SYSTEM_PROMPT + getKnowledgeBaseSection(kbContext);
   let result: Awaited<ReturnType<typeof callAI>>;
   let usedVision = false;
 

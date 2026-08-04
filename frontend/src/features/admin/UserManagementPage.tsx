@@ -17,6 +17,7 @@ interface ManagedUser {
   status: UserStatus;
   institution_id: string;
   unit_id: string;
+  qc_role?: string | null;
   institution?: { id: string; name: string; type: string };
   unit?: { id: string; name: string; level: number };
   created_at: string;
@@ -40,6 +41,7 @@ interface EditForm {
   role: string;
   institution_id: string;
   unit_id: string;
+  qc_role: string;
 }
 
 // ─── Constants ────────────────────────────────────────────────────────────────
@@ -75,6 +77,14 @@ const ALL_ROLES = [
   'REVIEWER', 'CHECKER', 'APPROVER', 'VENDOR', 'VIEWER',
 ];
 
+const QC_ROLES = [
+  { value: '', label: 'None (no QC access)' },
+  { value: 'SUPERVISOR', label: 'Supervisor' },
+  { value: 'INSPECTOR', label: 'Inspector' },
+  { value: 'QC_ENGINEER', label: 'QC Engineer' },
+  { value: 'QC_LEAD', label: 'QC Lead' },
+];
+
 // ─── Edit User Modal ──────────────────────────────────────────────────────────
 
 function EditUserModal({
@@ -93,6 +103,7 @@ function EditUserModal({
     role:           user.role,
     institution_id: user.institution_id ?? user.institution?.id ?? '',
     unit_id:        user.unit_id        ?? user.unit?.id         ?? '',
+    qc_role:        user.qc_role ?? '',
   });
 
   // Institutions list
@@ -140,7 +151,7 @@ function EditUserModal({
     if (!form.role)                return addToast('error', 'Role is required.');
     if (!form.institution_id)      return addToast('error', 'Institution is required.');
     if (!form.unit_id)             return addToast('error', 'Unit is required.');
-    updateMutation.mutate(form);
+    updateMutation.mutate({ ...form, qc_role: form.qc_role || null } as any);
   };
 
   return (
@@ -189,6 +200,23 @@ function EditUserModal({
           </select>
           <p className="text-[11px] text-gray-400 mt-1">
             Changing role affects what the user can see and do across the system.
+          </p>
+        </div>
+
+        {/* QC Role */}
+        <div>
+          <label className="label">Field QC Role</label>
+          <select
+            className="input"
+            value={form.qc_role}
+            onChange={(e) => setForm((f) => ({ ...f, qc_role: e.target.value }))}
+          >
+            {QC_ROLES.map((r) => (
+              <option key={r.value} value={r.value}>{r.label}</option>
+            ))}
+          </select>
+          <p className="text-[11px] text-gray-400 mt-1">
+            Grants access to the Field QC app. Leave as "None" if this user only uses QA.
           </p>
         </div>
 
@@ -396,9 +424,16 @@ export function UserManagementPage() {
 
                       {/* Role */}
                       <td className="table-cell">
-                        <span className={`badge ${ROLE_BADGE[user.role] ?? 'bg-gray-100 text-gray-600'}`}>
-                          {user.role.replace(/_/g, ' ')}
-                        </span>
+                        <div className="flex flex-col gap-1">
+                          <span className={`badge ${ROLE_BADGE[user.role] ?? 'bg-gray-100 text-gray-600'}`}>
+                            {user.role.replace(/_/g, ' ')}
+                          </span>
+                          {user.qc_role && (
+                            <span className="badge bg-emerald-100 text-emerald-700 text-[10px]">
+                              QC: {user.qc_role.replace(/_/g, ' ')}
+                            </span>
+                          )}
+                        </div>
                       </td>
 
                       {/* Institution / Unit */}

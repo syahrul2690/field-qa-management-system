@@ -31,6 +31,10 @@ RUN npm run build --workspace=backend
 FROM node:20-alpine AS production
 WORKDIR /app
 ENV NODE_ENV=production
+# knowledgeBaseService's dev-mode relative path (three levels up from dist/services)
+# doesn't resolve to anything meaningful in this image's flat /app layout, so point
+# it explicitly at the KB directory copied in below.
+ENV KNOWLEDGE_BASE_DIR=/app/Knowledge_Base
 
 # Install runtime deps for Prisma (openssl) and healthcheck (curl)
 RUN apk add --no-cache openssl curl
@@ -38,6 +42,7 @@ RUN apk add --no-cache openssl curl
 # Copy built artifacts
 COPY --from=builder /app/backend/dist ./dist
 COPY --from=builder /app/backend/prisma ./prisma
+COPY --from=builder /app/Knowledge_Base ./Knowledge_Base
 # Root node_modules first, then merge workspace-level packages on top
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/backend/node_modules ./node_modules

@@ -12,6 +12,12 @@ interface DocumentUploadFormProps {
   section: string;
 }
 
+const SECTION_LABEL: Record<string, string> = {
+  FIELD_ITP: 'Field ITP',
+  PROCEDURE: 'Procedure',
+  WORK_METHOD: 'Work Method',
+};
+
 export function DocumentUploadForm({ isOpen, onClose, boqItemId, section }: DocumentUploadFormProps) {
   const { addToast } = useUIStore();
   const queryClient = useQueryClient();
@@ -84,7 +90,7 @@ export function DocumentUploadForm({ isOpen, onClose, boqItemId, section }: Docu
 
         <div>
           <label className="label">Section</label>
-          <input type="text" value={section} disabled className="input bg-gray-50 text-gray-500" />
+          <input type="text" value={SECTION_LABEL[section] ?? section} disabled className="input bg-gray-50 text-gray-500" />
         </div>
 
         <div>

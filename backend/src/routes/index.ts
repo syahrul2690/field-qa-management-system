@@ -8,6 +8,7 @@ import { documentRoutes } from './documentRoutes';
 import { reviewRoutes } from './reviewRoutes';
 import { verifyRoutes } from './verifyRoutes';
 import { aiRoutes } from './aiRoutes';
+import { integrationRoutes } from './integrationRoutes';
 
 export const router = Router();
 
@@ -32,6 +33,9 @@ router.use('/verify', verifyRoutes);
 
 // AI features
 router.use('/ai', aiRoutes);
+
+// Integration API (service-to-service, API key auth)
+router.use('/integration', integrationRoutes);
 
 router.get('/', (_req, res) => {
   res.json({ success: true, message: 'Field QA Management System API v1.0' });

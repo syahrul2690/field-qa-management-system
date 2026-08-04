@@ -90,6 +90,38 @@ enum ActivityAction {
   REVIEW_REJECTED
 }
 
+enum QcRole {
+  SUPERVISOR
+  INSPECTOR
+  QC_ENGINEER
+  QC_LEAD
+}
+
+// PLN hold-point authority codes (per Knowledge_Base/agent.md + 04_Project_Quality_Plan_Field.md).
+// A single ITP row can carry a different code per responsible party — see
+// ItpItem.sub_code / pp_code / pln_code.
+enum InspectionLevel {
+  H   // Hold Point — work cannot proceed without this party's sign-off
+  W   // Witness Point — this party should witness (not mandatory hold)
+  SW  // Spot Witness — periodic/random check by this party
+  R   // Review — documentation review/verification
+  A   // Approval — formal engineering approval required
+  P   // Perform — this party performs & initials the activity itself
+}
+
+enum ItpPhase {
+  SHOP          // Factory / shop inspection
+  FIELD         // Site / field installation
+  COMMISSIONING // Functional & commissioning tests
+}
+
+enum ItpCategory {
+  SIPIL
+  ELEKTRIKAL
+  MEKANIKAL
+  INSTRUMEN_KONTROL
+}
+
 // ============================================================
 // IAM DOMAIN
 // ============================================================
@@ -144,6 +176,7 @@ model User {
   status         UserStatus @default(PENDING)
   institution_id String
   unit_id        String
+  qc_role        QcRole?
 
   institution Institution @relation(fields: [institution_id], references: [id])
   unit        Unit        @relation(fields: [unit_id], references: [id])
@@ -299,6 +332,7 @@ model Document {
   files        DocumentFile[]
   reviews      DocumentReview[]
   ai_analyses  AiDocumentAnalysis[]
+  itp_items    ItpItem[]
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -427,6 +461,35 @@ model CommentSheetItem {
 
   @@index([review_id])
   @@unique([review_id, seq_no])
+}
+
+// ============================================================
+// ITP INSPECTION ITEMS DOMAIN
+// ============================================================
+
+model ItpItem {
+  id                  String          @id @default(uuid())
+  document_id         String
+  seq_no              Int
+  activity            String
+  acceptance_criteria String?
+  reference_standard  String?
+  verifying_document  String?
+  // Responsibility matrix — the same activity often carries a different hold-point
+  // code per party (e.g. Sub: P, PP: R, PLN: H). Null means that party has no role.
+  sub_code            InspectionLevel? // Subcontractor
+  pp_code             InspectionLevel? // Main Contractor (Pelaksana Pekerjaan)
+  pln_code            InspectionLevel? // Client (PT PLN)
+  phase               ItpPhase        @default(FIELD)
+  category            ItpCategory
+
+  document Document @relation(fields: [document_id], references: [id], onDelete: Cascade)
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([document_id])
+  @@unique([document_id, seq_no])
 }
 
 // ============================================================

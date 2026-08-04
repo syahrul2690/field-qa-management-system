@@ -4,6 +4,7 @@ import { requireRole, requireInstitution } from '../middlewares/roleMiddleware';
 import { uploadPdfs } from '../middlewares/uploadMiddleware';
 import { Role, InstitutionType } from '@prisma/client';
 import * as documentController from '../controllers/documentController';
+import { getItpItems, saveItpItems } from '../controllers/reviewController';
 
 export const documentRoutes = Router();
 
@@ -43,3 +44,14 @@ documentRoutes.get('/history', authMiddleware, documentController.getDocumentHis
 
 // GET /api/documents/:documentId — Get single document (authenticated)
 documentRoutes.get('/:documentId', authMiddleware, documentController.getDocument);
+
+// GET /api/documents/:documentId/itp-items — List ITP inspection items (authenticated)
+documentRoutes.get('/:documentId/itp-items', authMiddleware, getItpItems);
+
+// PUT /api/documents/:documentId/itp-items — Save ITP inspection items (REVIEWER or CHECKER)
+documentRoutes.put(
+  '/:documentId/itp-items',
+  authMiddleware,
+  requireRole(Role.REVIEWER, Role.CHECKER),
+  saveItpItems,
+);

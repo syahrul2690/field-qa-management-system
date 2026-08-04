@@ -30,9 +30,17 @@ export type UserWithRelations = {
   approved_at: Date | null;
   created_at: Date;
   updated_at: Date;
+  // Top-level institution — the user's own institution_id relation (distinct
+  // from unit.institution, which is the *unit's* parent institution and is
+  // only kept here because buildTokenPayload() needs institution_type/unit_level).
+  institution: {
+    name: string;
+  };
   unit: {
+    name: string;
     level: number;
     institution: {
+      name: string;
       type: InstitutionType;
     };
   };
@@ -42,11 +50,15 @@ export async function findUserByEmail(email: string): Promise<UserWithRelations 
   return prisma.user.findUnique({
     where: { email },
     include: {
+      institution: {
+        select: { name: true },
+      },
       unit: {
         select: {
+          name: true,
           level: true,
           institution: {
-            select: { type: true },
+            select: { name: true, type: true },
           },
         },
       },
@@ -58,11 +70,15 @@ export async function findUserById(id: string): Promise<UserWithRelations | null
   return prisma.user.findUnique({
     where: { id },
     include: {
+      institution: {
+        select: { name: true },
+      },
       unit: {
         select: {
+          name: true,
           level: true,
           institution: {
-            select: { type: true },
+            select: { name: true, type: true },
           },
         },
       },
