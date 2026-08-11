@@ -15,9 +15,11 @@ RUN npm ci
 
 # ---- Builder stage ----
 FROM base AS builder
+# Every dependency hoists to the root node_modules. There was previously a
+# second COPY for backend/node_modules, which existed only because pdf-parse
+# could not be hoisted; that dependency is gone, npm no longer creates the
+# directory, and copying it fails the build.
 COPY --from=deps /app/node_modules ./node_modules
-# Copy workspace-level packages that npm didn't hoist (e.g. pdf-parse)
-COPY --from=deps /app/backend/node_modules ./backend/node_modules
 COPY . .
 
 # Build shared package first (backend depends on it)
@@ -31,9 +33,11 @@ RUN npm run build --workspace=backend
 FROM node:20-alpine AS production
 WORKDIR /app
 ENV NODE_ENV=production
-# knowledgeBaseService's dev-mode relative path (three levels up from dist/services)
-# doesn't resolve to anything meaningful in this image's flat /app layout, so point
-# it explicitly at the KB directory copied in below.
+# config.knowledgeBase resolves a dev-mode relative path (three levels up from
+# dist/services) that means nothing in this image's flat /app layout, so it is
+# pointed explicitly at the KB directory copied in below. Nothing reads it yet —
+# the whole-file injection it used to serve was removed with the old AI features
+# — but the corpus is staged here for the chunked search tool.
 ENV KNOWLEDGE_BASE_DIR=/app/Knowledge_Base
 
 # Install runtime deps for Prisma (openssl) and healthcheck (curl)
@@ -43,9 +47,7 @@ RUN apk add --no-cache openssl curl
 COPY --from=builder /app/backend/dist ./dist
 COPY --from=builder /app/backend/prisma ./prisma
 COPY --from=builder /app/Knowledge_Base ./Knowledge_Base
-# Root node_modules first, then merge workspace-level packages on top
 COPY --from=builder /app/node_modules ./node_modules
-COPY --from=builder /app/backend/node_modules ./node_modules
 COPY --from=builder /app/package*.json ./
 
 # Uploads volume mount point
