@@ -7,7 +7,6 @@ import { useAuthStore } from '../../store/authStore';
 import { useUIStore } from '../../store/uiStore';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { StatusBadge } from '../../components/ui/StatusBadge';
-import { AiReviewAssistantPanel } from '../../components/ai/AiReviewAssistantPanel';
 
 // ── Interfaces ────────────────────────────────────────────────────────────────
 
@@ -998,11 +997,6 @@ export function ReviewDetailPage() {
           </div>
         )}
       </div>
-
-      {/* ── AI Review Assistant ── */}
-      {review.document_id && (
-        <AiReviewAssistantPanel documentId={review.document_id} />
-      )}
 
       {/* ── Comment Sheet Panel ── */}
       {showCommentSheet && reviewId && (

@@ -39,7 +39,8 @@ services:
       DEFAULT_SLA_DAYS: ${DEFAULT_SLA_DAYS:-7}
       AI_ENABLED: ${AI_ENABLED:-false}
       OPENROUTER_API_KEY: ${OPENROUTER_API_KEY:-}
-      AI_MODEL: ${AI_MODEL:-qwen/qwen3-235b-a22b}
+      AI_CHAT_MODEL: ${AI_CHAT_MODEL:-anthropic/claude-3-5-haiku}
+      AI_MAX_TOKENS: ${AI_MAX_TOKENS:-4096}
     volumes:
       - uploads_data:/app/uploads
     ports:

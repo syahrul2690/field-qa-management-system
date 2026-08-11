@@ -55,8 +55,10 @@ export const config = {
 
   ai: {
     openRouterKey: process.env.OPENROUTER_API_KEY ?? '',
-    model: process.env.AI_MODEL ?? 'qwen/qwen3-235b-a22b',
-    visionModel: process.env.AI_VISION_MODEL ?? 'anthropic/claude-3-5-haiku',
+    // The assistant drives a tool-calling loop, so the model must follow the
+    // `tools` contract reliably and must not emit reasoning into `content`.
+    // Reasoning models (qwen3 thinking, for one) fail both and are a poor fit.
+    chatModel: process.env.AI_CHAT_MODEL ?? 'anthropic/claude-3-5-haiku',
     maxTokens: parseInt(process.env.AI_MAX_TOKENS ?? '4096', 10),
     enabled: (process.env.AI_ENABLED ?? 'false') === 'true',
   },

@@ -176,3 +176,29 @@ _This file tracks patterns and corrections to prevent repeated mistakes._
 - Do not keep iterating on the same approach (raw paste → base64 → envs).
 - Instead, redesign to eliminate the problematic secret entirely.
 - In this project: replaced git-on-VPS with SCP of compose file — `GH_DEPLOY_KEY` secret no longer needed.
+
+## Session: 2026-08-11 — Chat assistant review fixes
+
+### Lesson 23: Vitest transpiles without type-checking — a passing suite can still fail CI
+- A test file can pass under `vitest run` while `tsc` rejects it (union not
+  narrowed, missing import), because Vitest uses esbuild and skips type errors.
+- The CI gate that catches this is `npm run build` (tsc), which runs before
+  `test:ci` — but only if you actually run it locally before pushing.
+- Rule: after adding or editing any test file, run the workspace build
+  (`npm run build`) in addition to the test suite.
+
+### Lesson 24: DB-backed integration tests must provision their own fixtures or CI will fail
+- A fresh Postgres has no dev data: the scopedRepo integration test originally
+  assumed the dev database was populated, so it failed 4/10 on an empty CI DB.
+- The seed script only creates institutions/users — it does not create
+  projects/documents, so "migrate + seed" is not a substitute for real data.
+- Rule: integration tests that need domain rows should create (and tear down)
+  their own fixtures in `beforeAll` / `afterAll`, so they are hermetic and can
+  run on any database, including a CI service container.
+
+### Lesson 25: Negating a TypeScript type guard does not narrow the union
+- `expect(isNotFound(result)).toBe(false)` still leaves `result` as the union,
+  because narrowing only happens on the positive branch.
+- Rule: when a result can be a discriminated union, assert the impossible
+  branch explicitly (`if (isNotFound(result)) throw ...`) so the compiler
+  narrows the remaining code.

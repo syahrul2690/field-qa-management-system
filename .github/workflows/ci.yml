@@ -10,6 +10,26 @@ jobs:
   lint-and-build:
     name: Lint & Build
     runs-on: ubuntu-latest
+    # scopedRepo.integration.test.ts proves the chat tools cannot read across
+    # institution boundaries against a real database, so the CI job runs a
+    # disposable Postgres. The test creates its own fixture rows, so only the
+    # migrations need to be applied before the test phase.
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: qa_user
+          POSTGRES_PASSWORD: qa_password
+          POSTGRES_DB: field_qa_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U qa_user -d field_qa_db"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DATABASE_URL: postgresql://qa_user:qa_password@localhost:5432/field_qa_db
 
     steps:
       - name: Checkout repository
@@ -35,6 +55,9 @@ jobs:
 
       - name: Type-check frontend
         run: npm run build --workspace=frontend
+
+      - name: Run backend migrations
+        run: npm run migrate:deploy --workspace=backend
 
       - name: Run backend tests
         run: npm run test:ci --workspace=backend

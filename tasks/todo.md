@@ -274,3 +274,64 @@ Access URL: `http://103.93.161.157:8080`
 
 ### Pipeline Status
 🟢 **LIVE** — `http://103.93.161.157:8080` — Every push to `main` auto-deploys
+
+---
+
+## Chat assistant — replaces AI summary card + review assistant (2026-08-11)
+
+Pivoted the AI surface from two one-shot JSON features to a tool-calling
+conversational assistant. Plan: `~/.claude/plans/indexed-singing-puddle.md`.
+
+- [x] `accessScopeService` — project-level scope filter + nested builders for
+      BoqItem / Document / DocumentReview / ItpItem / CommentSheetItem
+- [x] Prisma: drop `AiProjectSummary` + `AiDocumentAnalysis`, add
+      `ChatConversation` / `ChatMessage` / `ChatRole`
+- [x] `chat/scopedRepo` — the only chat module allowed to touch Prisma
+- [x] `chat/registry` + 4 read-only tools, `sanitize`, `systemPrompt`
+- [x] `chat/agentLoop` — streaming tool-call loop
+- [x] SSE endpoints, per-user `chatRateLimiter`, `/ai` → `/chat`
+- [x] Frontend `tokenRefresh` extraction, `chatApi` SSE client, `ChatWidget`
+- [x] Deleted both old features and their now-dead dependencies
+- [x] Tests: 110 backend / 19 frontend passing (verified with a real Postgres)
+
+### Review
+
+**Why the scoping helper came first.** The backend only filtered by institution
+in two places (`projectService.listProjects` and `getProjectById`); every child
+entity was a bare id lookup behind `authMiddleware`. That is an ID-guessing leak
+today, but a chatbot that resolves ids from natural language turns it into an
+enumeration leak. `accessScopeService` is the choke point, and
+`chatScopeBoundary.test.ts` enforces mechanically that no tool bypasses it.
+
+**Still outstanding.** The existing REST controllers remain unscoped — the
+chatbot does not make that worse, but it does not fix it either. Retrofitting
+them is Phase 3 and wants its own change with its own test pass.
+
+**Phase 2 not built:** knowledge-base chunked search, pending-reviews / BOQ-tree
+/ ITP-items tools, conversation history drawer, citation chips.
+
+### Post-review fixes (same session)
+
+First review found the branch was not merge-ready. All fixed before deploy:
+
+- **CI blocker: backend `tsc` failed** — the new integration test accessed
+  `result.total` / `result.documents` on a `NotFound | result` union. Vitest
+  transpiles without type-checking, so tests passed while `npm run build`
+  failed. Narrowed the union explicitly.
+- **CI blocker: integration test needed a database CI never had** — now CI
+  provisions a throwaway Postgres service and runs `prisma migrate deploy`
+  before the test phase, and the test creates its own project / BOQ item /
+  document fixtures instead of assuming dev data.
+- **Stop button showed a fake error** — aborting the in-flight `fetch` was
+  caught as "The connection was interrupted."; AbortError is now ignored.
+- **Frontend chat had zero tests** — added chatApi SSE-parser + stream tests
+  and chatStore tests (send/stream/error/stop/reset); 7 → 19 passing.
+- **seq_no race** — two parallel streams into one conversation could collide
+  on `@@unique([conversation_id, seq_no])`; P2002 is now retried once after
+  re-reading the sequence.
+- **Small cleanups** — stale test-name comment, usage-token double-count guard,
+  assistant links now use SPA routing, widget got dialog semantics + Escape to
+  close + autofocus.
+
+Verified end-to-end: backend `tsc` clean, backend 110/110 with Postgres,
+frontend build clean, frontend 19/19.

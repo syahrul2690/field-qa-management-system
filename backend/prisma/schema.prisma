@@ -25,7 +25,7 @@ enum InstitutionType {
 enum Role {
   ADMIN
   PIC_PROJECT
-  PIC_CONSULTANT  // Consultant institution coordinator — assigns review team
+  PIC_CONSULTANT // Consultant institution coordinator — assigns review team
   VENDOR
   REVIEWER
   CHECKER
@@ -101,17 +101,17 @@ enum QcRole {
 // A single ITP row can carry a different code per responsible party — see
 // ItpItem.sub_code / pp_code / pln_code.
 enum InspectionLevel {
-  H   // Hold Point — work cannot proceed without this party's sign-off
-  W   // Witness Point — this party should witness (not mandatory hold)
-  SW  // Spot Witness — periodic/random check by this party
-  R   // Review — documentation review/verification
-  A   // Approval — formal engineering approval required
-  P   // Perform — this party performs & initials the activity itself
+  H // Hold Point — work cannot proceed without this party's sign-off
+  W // Witness Point — this party should witness (not mandatory hold)
+  SW // Spot Witness — periodic/random check by this party
+  R // Review — documentation review/verification
+  A // Approval — formal engineering approval required
+  P // Perform — this party performs & initials the activity itself
 }
 
 enum ItpPhase {
-  SHOP          // Factory / shop inspection
-  FIELD         // Site / field installation
+  SHOP // Factory / shop inspection
+  FIELD // Site / field installation
   COMMISSIONING // Functional & commissioning tests
 }
 
@@ -131,7 +131,7 @@ model Institution {
   name    String
   type    InstitutionType
   address String?
-  logo    String?         // file path to logo image
+  logo    String? // file path to logo image
 
   units Unit[]
   users User[]
@@ -149,7 +149,7 @@ model Unit {
   institution_id String
   parent_unit_id String?
   name           String
-  level          Int     // 0=Root, 1=Child, 2=Grandchild
+  level          Int // 0=Root, 1=Child, 2=Grandchild
   description    String?
 
   institution Institution @relation(fields: [institution_id], references: [id], onDelete: Cascade)
@@ -182,17 +182,18 @@ model User {
   unit        Unit        @relation(fields: [unit_id], references: [id])
 
   // Relations
-  projects_created   Project[]         @relation("ProjectCreator")
-  documents_uploaded Document[]        @relation("DocumentUploader")
-  reviews_as_reviewer DocumentReview[] @relation("ReviewReviewer")
-  reviews_as_checker  DocumentReview[] @relation("ReviewChecker")
-  reviews_as_approver DocumentReview[] @relation("ReviewApprover")
+  projects_created    Project[]          @relation("ProjectCreator")
+  documents_uploaded  Document[]         @relation("DocumentUploader")
+  reviews_as_reviewer DocumentReview[]   @relation("ReviewReviewer")
+  reviews_as_checker  DocumentReview[]   @relation("ReviewChecker")
+  reviews_as_approver DocumentReview[]   @relation("ReviewApprover")
   review_comments     ReviewComment[]
-  ams_letters         AmsLetter[]    @relation("AmsUploader")
+  ams_letters         AmsLetter[]        @relation("AmsUploader")
   activity_logs       ActivityLog[]
+  chat_conversations  ChatConversation[]
 
-  refresh_token          String?
-  refresh_token_expires  DateTime?
+  refresh_token         String?
+  refresh_token_expires DateTime?
 
   approved_by String?
   approved_at DateTime?
@@ -210,7 +211,7 @@ model User {
 // ============================================================
 
 model Project {
-  id                      String      @id @default(uuid())
+  id                      String         @id @default(uuid())
   name                    String
   description             String?
   contract_signing_date   DateTime
@@ -231,7 +232,6 @@ model Project {
   amendments        ProjectAmendment[]
   vendor_visibility ProjectVendorVisibility[]
   boq_items         BoqItem[]
-  ai_summary        AiProjectSummary?
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -266,8 +266,8 @@ model ProjectAmendment {
 
 // Controls which vendor institutions can see and submit to a project
 model ProjectVendorVisibility {
-  id                   String @id @default(uuid())
-  project_id           String
+  id                    String @id @default(uuid())
+  project_id            String
   vendor_institution_id String
 
   project            Project     @relation(fields: [project_id], references: [id], onDelete: Cascade)
@@ -289,15 +289,15 @@ model BoqItem {
   id             String  @id @default(uuid())
   project_id     String
   parent_item_id String?
-  level          Int     // 1=Area, 2=Sub-area, 3=Equipment, etc.
-  item_code      String  // User-visible hierarchical code
+  level          Int // 1=Area, 2=Sub-area, 3=Equipment, etc.
+  item_code      String // User-visible hierarchical code
   system_tag     String  @unique // Auto-generated unique system tag
   title          String
   description    String?
   sort_order     Int     @default(0)
 
-  project Project  @relation(fields: [project_id], references: [id], onDelete: Cascade)
-  parent  BoqItem? @relation("BoqHierarchy", fields: [parent_item_id], references: [id])
+  project  Project   @relation(fields: [project_id], references: [id], onDelete: Cascade)
+  parent   BoqItem?  @relation("BoqHierarchy", fields: [parent_item_id], references: [id])
   children BoqItem[] @relation("BoqHierarchy")
 
   documents Document[]
@@ -329,10 +329,9 @@ model Document {
   uploaded_by String
   uploader    User    @relation("DocumentUploader", fields: [uploaded_by], references: [id])
 
-  files        DocumentFile[]
-  reviews      DocumentReview[]
-  ai_analyses  AiDocumentAnalysis[]
-  itp_items    ItpItem[]
+  files     DocumentFile[]
+  reviews   DocumentReview[]
+  itp_items ItpItem[]
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -347,7 +346,7 @@ model DocumentFile {
   document_id String
   file_name   String
   file_path   String // Relative path under uploads dir
-  file_size   Int    // bytes
+  file_size   Int // bytes
   mime_type   String
 
   document Document @relation(fields: [document_id], references: [id], onDelete: Cascade)
@@ -381,7 +380,7 @@ model DocumentReview {
   approved_at DateTime?
 
   final_status       ReviewStatus?
-  comment_sheet_path String?       // Path to generated PDF
+  comment_sheet_path String? // Path to generated PDF
 
   // QR verification hash (uuid, unique)
   qr_hash String @unique @default(uuid())
@@ -391,14 +390,14 @@ model DocumentReview {
   checker  User?    @relation("ReviewChecker", fields: [checker_id], references: [id])
   approver User?    @relation("ReviewApprover", fields: [approver_id], references: [id])
 
-  comments             ReviewComment[]
-  ams_letter           AmsLetter?
-  comment_sheet_items  CommentSheetItem[]
+  comments            ReviewComment[]
+  ams_letter          AmsLetter?
+  comment_sheet_items CommentSheetItem[]
 
   // QR timestamps — set when each stage action completes
-  reviewer_qr_at DateTime?   // when Reviewer submitted (Prepared By QR stamped)
-  checker_qr_at  DateTime?   // when Checker approved   (Reviewed By QR stamped)
-  approver_qr_at DateTime?   // when Approver approved  (Approved By QR stamped)
+  reviewer_qr_at DateTime? // when Reviewer submitted (Prepared By QR stamped)
+  checker_qr_at  DateTime? // when Checker approved   (Reviewed By QR stamped)
+  approver_qr_at DateTime? // when Approver approved  (Approved By QR stamped)
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -412,14 +411,14 @@ model DocumentReview {
 }
 
 model AmsLetter {
-  id          String @id @default(uuid())
-  review_id   String @unique
-  ams_number  String?   // e.g. "AMS/2026/001"
+  id          String    @id @default(uuid())
+  review_id   String    @unique
+  ams_number  String? // e.g. "AMS/2026/001"
   ams_date    DateTime? // Date stated on the AMS letter
-  ams_title   String?   // Title/subject of the AMS letter
+  ams_title   String? // Title/subject of the AMS letter
   file_name   String
-  file_path   String  // Relative path under uploads dir (e.g., ams/filename.pdf)
-  file_size   Int     // bytes
+  file_path   String // Relative path under uploads dir (e.g., ams/filename.pdf)
+  file_size   Int // bytes
   mime_type   String
   uploaded_by String
 
@@ -435,9 +434,9 @@ model ReviewComment {
   id           String  @id @default(uuid())
   review_id    String
   commenter_id String
-  page_ref     String?   // e.g., "Page 3, Section 2.1"
+  page_ref     String? // e.g., "Page 3, Section 2.1"
   comment      String
-  disposition  String?   // 'A', 'B', or 'C' — commenter's recommendation
+  disposition  String? // 'A', 'B', or 'C' — commenter's recommendation
 
   review    DocumentReview @relation(fields: [review_id], references: [id], onDelete: Cascade)
   commenter User           @relation(fields: [commenter_id], references: [id])
@@ -448,19 +447,19 @@ model ReviewComment {
 }
 
 model CommentSheetItem {
-  id                   String         @id @default(uuid())
-  review_id            String
-  seq_no               Int            // 1-based sequence number
-  pln_comment          String         // PLN's review comment text
-  contractor_response  String?        // Contractor's response (filled later)
+  id                  String  @id @default(uuid())
+  review_id           String
+  seq_no              Int // 1-based sequence number
+  pln_comment         String // PLN's review comment text
+  contractor_response String? // Contractor's response (filled later)
 
-  review  DocumentReview @relation(fields: [review_id], references: [id], onDelete: Cascade)
+  review DocumentReview @relation(fields: [review_id], references: [id], onDelete: Cascade)
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
-  @@index([review_id])
   @@unique([review_id, seq_no])
+  @@index([review_id])
 }
 
 // ============================================================
@@ -468,7 +467,7 @@ model CommentSheetItem {
 // ============================================================
 
 model ItpItem {
-  id                  String          @id @default(uuid())
+  id                  String           @id @default(uuid())
   document_id         String
   seq_no              Int
   activity            String
@@ -480,7 +479,7 @@ model ItpItem {
   sub_code            InspectionLevel? // Subcontractor
   pp_code             InspectionLevel? // Main Contractor (Pelaksana Pekerjaan)
   pln_code            InspectionLevel? // Client (PT PLN)
-  phase               ItpPhase        @default(FIELD)
+  phase               ItpPhase         @default(FIELD)
   category            ItpCategory
 
   document Document @relation(fields: [document_id], references: [id], onDelete: Cascade)
@@ -488,8 +487,8 @@ model ItpItem {
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
 
-  @@index([document_id])
   @@unique([document_id, seq_no])
+  @@index([document_id])
 }
 
 // ============================================================
@@ -500,9 +499,9 @@ model ActivityLog {
   id          String         @id @default(uuid())
   user_id     String?
   action      ActivityAction
-  entity_type String?        // e.g., 'Document', 'Project', 'User'
-  entity_id   String?        // ID of the affected entity
-  metadata    Json?          // Additional context (old/new values, etc.)
+  entity_type String? // e.g., 'Document', 'Project', 'User'
+  entity_id   String? // ID of the affected entity
+  metadata    Json? // Additional context (old/new values, etc.)
   ip_address  String?
 
   user User? @relation(fields: [user_id], references: [id])
@@ -516,34 +515,68 @@ model ActivityLog {
 }
 
 // ============================================================
-// AI DOMAIN
+// CHAT DOMAIN
 // ============================================================
 
-model AiProjectSummary {
-  id           String   @id @default(uuid())
-  project_id   String   @unique
-  summary      Json
-  model_used   String
-  generated_at DateTime @default(now())
-  expires_at   DateTime
-  token_usage  Int?
+enum ChatRole {
+  USER
+  ASSISTANT
+  TOOL
+}
 
-  project Project @relation(fields: [project_id], references: [id], onDelete: Cascade)
+model ChatConversation {
+  id      String  @id @default(uuid())
+  user_id String
+  title   String?
 
+  // The page the conversation was started from. Advisory context for the
+  // assistant only -- every tool call is re-scoped server side, so this is
+  // never consulted for authorization.
+  project_id String?
+
+  // Identifies the visibility scope in force when the conversation began.
+  // If the user's role or institution changes, the mismatch forces a new
+  // conversation so tool results captured under a wider scope cannot be
+  // replayed into the model.
+  scope_fingerprint String
+
+  user     User          @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  messages ChatMessage[]
+
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
+
+  @@index([user_id, updated_at])
   @@index([project_id])
 }
 
-model AiDocumentAnalysis {
-  id           String   @id @default(uuid())
-  document_id  String
-  revision_no  Int
-  analysis     Json
-  model_used   String
-  generated_at DateTime @default(now())
-  token_usage  Int?
+model ChatMessage {
+  id              String   @id @default(uuid())
+  conversation_id String
+  seq_no          Int
+  role            ChatRole
 
-  document Document @relation(fields: [document_id], references: [id], onDelete: Cascade)
+  // Null on assistant turns that only carry tool calls.
+  content String?
 
-  @@unique([document_id, revision_no])
-  @@index([document_id])
+  // JSON: the provider tool_calls array, stored verbatim so history can be
+  // replayed into the model without reconstruction. Set on ASSISTANT rows.
+  tool_calls Json?
+
+  // Set on TOOL rows. tool_name is denormalized for analytics.
+  tool_call_id String?
+  tool_name    String?
+
+  model_used        String?
+  prompt_tokens     Int?
+  completion_tokens Int?
+  latency_ms        Int?
+  error             String?
+
+  conversation ChatConversation @relation(fields: [conversation_id], references: [id], onDelete: Cascade)
+
+  created_at DateTime @default(now())
+
+  @@unique([conversation_id, seq_no])
+  @@index([conversation_id])
 }
