@@ -9,7 +9,6 @@ import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { Modal } from '../../components/ui/Modal';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { DocumentDetailModal } from '../documents/DocumentDetailModal';
-import { AiProjectSummaryCard } from '../../components/ai/AiProjectSummaryCard';
 
 interface NominalValue {
   currency: string;
@@ -274,9 +273,6 @@ export function ProjectDetailPage() {
           </div>
         )}
       </div>
-
-      {/* AI Project Summary */}
-      <AiProjectSummaryCard projectId={id!} />
 
       {/* Completed Documents (Status A, B, C) */}
       <div className="card overflow-hidden">

@@ -117,6 +117,24 @@ DEFAULT_SLA_DAYS=7
 MAX_FILE_SIZE_MB=50
 ```
 
+> **Enabling the chat assistant.** Set `AI_ENABLED=true` and `OPENROUTER_API_KEY` in
+> **this root `.env`**, next to `docker-compose.prod.yml`. Compose reads the AI
+> variables from here, not from `backend/.env` — that file is gitignored and never
+> reaches the image, so a key set only there leaves the assistant reporting
+> "not configured" in production. Optionally set `AI_CHAT_MODEL` (defaults to
+> `anthropic/claude-3-5-haiku`); it must be a model with reliable tool calling.
+>
+> The assistant streams over Server-Sent Events. `frontend/nginx.conf` already sets
+> `proxy_buffering off` for `/api`, but if you terminate TLS at a **host-level
+> nginx** in front of the container, that server block needs the same three
+> directives or replies will arrive all at once when the answer completes:
+>
+> ```nginx
+> proxy_buffering off;
+> proxy_cache off;
+> proxy_read_timeout 300s;
+> ```
+
 > Generate secrets with: `openssl rand -base64 48`
 
 ### 3. Open firewall port 8080

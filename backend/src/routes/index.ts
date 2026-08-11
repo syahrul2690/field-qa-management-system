@@ -7,7 +7,7 @@ import { boqProjectRoutes, boqItemRoutes } from './boqRoutes';
 import { documentRoutes } from './documentRoutes';
 import { reviewRoutes } from './reviewRoutes';
 import { verifyRoutes } from './verifyRoutes';
-import { aiRoutes } from './aiRoutes';
+import { chatRoutes } from './chatRoutes';
 import { integrationRoutes } from './integrationRoutes';
 
 export const router = Router();
@@ -31,8 +31,8 @@ router.use('/documents', documentRoutes);
 router.use('/reviews', reviewRoutes);
 router.use('/verify', verifyRoutes);
 
-// AI features
-router.use('/ai', aiRoutes);
+// AI assistant (tool-calling chat)
+router.use('/chat', chatRoutes);
 
 // Integration API (service-to-service, API key auth)
 router.use('/integration', integrationRoutes);

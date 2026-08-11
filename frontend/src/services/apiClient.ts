@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getAccessToken, refreshAccessToken } from './tokenRefresh';
 
 const apiClient = axios.create({
   baseURL: '/api',
@@ -8,50 +9,23 @@ const apiClient = axios.create({
 
 // Request interceptor: attach access token from localStorage
 apiClient.interceptors.request.use((config) => {
-  const token = localStorage.getItem('access_token');
+  const token = getAccessToken();
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
 
-// Response interceptor: on 401, try to refresh token once
-let isRefreshing = false;
-let failedQueue: Array<{ resolve: (v: unknown) => void; reject: (e: unknown) => void }> = [];
-
-const processQueue = (error: unknown, token: string | null = null) => {
-  failedQueue.forEach((p) => (error ? p.reject(error) : p.resolve(token)));
-  failedQueue = [];
-};
-
+// Response interceptor: on 401, refresh once and replay.
+// The de-duplication lives in tokenRefresh so that the SSE client, which
+// cannot use interceptors, shares the same in-flight promise.
 apiClient.interceptors.response.use(
   (res) => res,
   async (error) => {
     const original = error.config;
-    if (error.response?.status === 401 && !original._retry) {
-      if (isRefreshing) {
-        return new Promise((resolve, reject) => {
-          failedQueue.push({ resolve, reject });
-        }).then((token) => {
-          original.headers.Authorization = `Bearer ${token}`;
-          return apiClient(original);
-        });
-      }
+    if (error.response?.status === 401 && original && !original._retry) {
       original._retry = true;
-      isRefreshing = true;
-      try {
-        const res = await axios.post('/api/auth/refresh', {}, { withCredentials: true });
-        const newToken = res.data.data.access_token;
-        localStorage.setItem('access_token', newToken);
-        processQueue(null, newToken);
-        original.headers.Authorization = `Bearer ${newToken}`;
-        return apiClient(original);
-      } catch (err) {
-        processQueue(err, null);
-        localStorage.removeItem('access_token');
-        window.location.href = '/login';
-        return Promise.reject(err);
-      } finally {
-        isRefreshing = false;
-      }
+      const token = await refreshAccessToken();
+      original.headers.Authorization = `Bearer ${token}`;
+      return apiClient(original);
     }
     return Promise.reject(error);
   }

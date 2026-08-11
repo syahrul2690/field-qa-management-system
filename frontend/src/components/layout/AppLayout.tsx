@@ -4,6 +4,7 @@ import { useAuthStore } from '../../store/authStore';
 import { authApi } from '../../services/authApi';
 import { useUIStore } from '../../store/uiStore';
 import { NotificationCenter } from '../ui/NotificationCenter';
+import { ChatWidget } from '../../features/chat/ChatWidget';
 import plnLogo from '../../assets/Logo_PLN.svg';
 
 interface NavItem {
@@ -254,6 +255,10 @@ export function AppLayout() {
           <Outlet />
         </main>
       </div>
+
+      {/* Mounted here rather than in App so it is authenticated-only by
+          construction — AppLayout renders only inside AuthGuard. */}
+      <ChatWidget />
     </div>
   );
 }
