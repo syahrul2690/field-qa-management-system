@@ -335,3 +335,10 @@ First review found the branch was not merge-ready. All fixed before deploy:
 
 Verified end-to-end: backend `tsc` clean, backend 110/110 with Postgres,
 frontend build clean, frontend 19/19.
+
+### CI follow-up (2026-08-12)
+
+First green attempt failed at the test phase: `scopedRepo.integration.test.ts`
+imports the real config via `slaService`, which requires `JWT_ACCESS_SECRET` /
+`JWT_REFRESH_SECRET` at module load, and CI has no gitignored `backend/.env`
+to supply them. Added test-only JWT secrets to the CI job env (lesson 26).

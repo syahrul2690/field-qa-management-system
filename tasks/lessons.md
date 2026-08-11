@@ -202,3 +202,13 @@ _This file tracks patterns and corrections to prevent repeated mistakes._
 - Rule: when a result can be a discriminated union, assert the impossible
   branch explicitly (`if (isNotFound(result)) throw ...`) so the compiler
   narrows the remaining code.
+
+### Lesson 26: A DB-backed test suite can fail before any test runs — config is imported at module load
+- `scopedRepo.integration.test.ts` imports `slaService` → `config/index.ts`,
+  which calls `required('JWT_ACCESS_SECRET')` at import time. Locally the
+  gitignored `backend/.env` masks the requirement; CI has no `.env`, so the
+  suite failed with `Missing required env var` before a single test executed.
+- Rule: when adding a suite that imports the real config transitively, either
+  mock `config` (as `agentLoop.test.ts` / `authService.test.ts` do) or make
+  sure the CI job env supplies every `required()` var. Test-only secret values
+  are fine — production secrets never enter the workflow.
