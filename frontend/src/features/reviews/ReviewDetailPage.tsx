@@ -212,9 +212,9 @@ function CommentSheetPanel({ reviewId, review, canEdit, role }: CommentSheetPane
   return (
     <div className="card overflow-hidden border-l-4 border-teal-400">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+      <div className="px-6 py-4 border-b border-gray-100 flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-2">
-          <svg className="h-5 w-5 text-teal-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+          <svg className="h-5 w-5 flex-shrink-0 text-teal-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
           </svg>
           <h2 className="font-semibold text-gray-900">Comment Sheet</h2>
@@ -235,7 +235,7 @@ function CommentSheetPanel({ reviewId, review, canEdit, role }: CommentSheetPane
       {/* QR Signature stamps */}
       <div className="px-6 pt-4 pb-3 bg-gray-50 border-b border-gray-100">
         <p className="text-xs font-semibold text-gray-500 mb-2">Digital Signatures (QR Code)</p>
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
           <QrStamp label="Prepared By" stampedAt={review.reviewer_qr_at} name={review.reviewer?.name} />
           <QrStamp label="Reviewed By" stampedAt={review.checker_qr_at}  name={review.checker?.name} />
           <QrStamp label="Approved By" stampedAt={review.approver_qr_at} name={review.approver?.name} />
@@ -923,8 +923,8 @@ export function ReviewDetailPage() {
 
       {/* Document info header */}
       <div className="card p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
+        <div className="flex flex-col-reverse sm:flex-row items-start sm:justify-between gap-3 sm:gap-4">
+          <div className="min-w-0">
             <p className="text-xs font-mono text-gray-500">{review.document_number ?? '—'}</p>
             <h1 className="text-xl font-bold text-gray-900 mt-1">
               {review.document_title ?? 'Untitled Document'}
@@ -938,7 +938,7 @@ export function ReviewDetailPage() {
           <StatusBadge status={review.status} />
         </div>
 
-        <div className="mt-4 grid grid-cols-2 gap-3 text-xs text-gray-500">
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-gray-500">
           <div>
             <span>Submitted: </span>
             <span className="text-gray-700 font-medium">{formatDate(review.created_at)}</span>
@@ -954,7 +954,7 @@ export function ReviewDetailPage() {
         {/* Workflow assignments */}
         <div className="mt-4 pt-4 border-t border-gray-100">
           <h3 className="text-xs font-semibold text-gray-700 mb-2">Review Team</h3>
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {(['reviewer', 'checker', 'approver'] as const).map((role) => {
               const person = review[role];
               const stageMap = { reviewer: 'REVIEW', checker: 'CHECK', approver: 'APPROVE' };
@@ -1050,7 +1050,7 @@ export function ReviewDetailPage() {
           <>
             {review.ams_letter ? (
               <div className="space-y-3">
-                <div className="grid grid-cols-3 gap-3 text-sm">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
                   <div className="bg-indigo-50 rounded-md px-3 py-2 border border-indigo-100">
                     <p className="text-xs text-indigo-400 font-medium mb-0.5">AMS Number</p>
                     <p className="text-indigo-900 font-semibold">{review.ams_letter.ams_number ?? '—'}</p>
@@ -1125,7 +1125,7 @@ export function ReviewDetailPage() {
                     </p>
                   </div>
                 </div>
-                <div className="grid grid-cols-3 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <div>
                     <label className="label text-amber-800">AMS Number</label>
                     <input type="text" value={amsNumber} onChange={e => setAmsNumber(e.target.value)} className="input" placeholder="e.g. AMS/2026/001" />
@@ -1220,7 +1220,7 @@ export function ReviewDetailPage() {
           </div>
           {review?.reviewer ? (
             <div className="space-y-3">
-              <div className="grid grid-cols-3 gap-3 text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-sm">
                 {(['reviewer', 'checker', 'approver'] as const).map((role) => {
                   const person = review[role];
                   const label = { reviewer: 'Reviewer', checker: 'Checker', approver: 'Approver' }[role];
@@ -1236,7 +1236,7 @@ export function ReviewDetailPage() {
             </div>
           ) : (
             <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="label">Reviewer <span className="text-red-500">*</span></label>
                   <select value={picReviewerId} onChange={e => setPicReviewerId(e.target.value)} className="input">
@@ -1294,7 +1294,7 @@ export function ReviewDetailPage() {
               />
             </div>
             {!review?.checker_id && (
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
                   <label className="label">Assign Checker <span className="text-red-500">*</span></label>
                   <select value={checkerId} onChange={e => setCheckerId(e.target.value)} className="input">
@@ -1312,7 +1312,7 @@ export function ReviewDetailPage() {
               </div>
             )}
             {review?.checker_id && (
-              <div className="grid grid-cols-2 gap-3 text-xs text-gray-500 bg-gray-50 rounded-md p-3 border border-gray-200">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-gray-500 bg-gray-50 rounded-md p-3 border border-gray-200">
                 <div><span className="font-semibold text-gray-600">Checker: </span>{review.checker?.name ?? '—'}</div>
                 <div><span className="font-semibold text-gray-600">Approver: </span>{review.approver?.name ?? '—'}</div>
               </div>

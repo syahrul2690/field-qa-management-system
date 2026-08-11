@@ -154,7 +154,7 @@ export function ProjectFormPage() {
 
           <div>
             <label className="label">Project Urgency / Criticality <span className="text-red-500">*</span></label>
-            <div className="grid grid-cols-4 gap-2">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {URGENCY_OPTIONS.map((opt) => (
                 <button
                   key={opt.value}
@@ -194,7 +194,7 @@ export function ProjectFormPage() {
             />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="label">Project Effective Date</label>
               <input

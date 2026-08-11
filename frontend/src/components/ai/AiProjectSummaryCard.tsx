@@ -81,7 +81,7 @@ export function AiProjectSummaryCard({ projectId }: { projectId: string }) {
       >
         <div className="flex items-center gap-2">
           <svg
-            className="h-4.5 w-4.5 text-primary-500"
+            className="h-5 w-5 flex-shrink-0 text-primary-500"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -225,7 +225,7 @@ function SummaryContent({ data }: { data: SummaryData }) {
           <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">
             SLA Compliance
           </h3>
-          <div className="grid grid-cols-3 gap-3 mb-2">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-2">
             <MetricCard
               label="On-Time"
               value={`${summary.sla_compliance.on_time_percentage}%`}

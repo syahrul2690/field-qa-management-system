@@ -82,7 +82,7 @@ function ReviewHistorySection({ reviewId }: { reviewId: string }) {
   return (
     <div className="space-y-4">
       {/* Workflow team */}
-      <div className="grid grid-cols-3 gap-2 text-xs">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
         {(['reviewer', 'checker', 'approver'] as const).map((role) => {
           const person = review[role];
           const labelMap = { reviewer: 'Reviewer', checker: 'Checker', approver: 'Approver' };
@@ -96,7 +96,7 @@ function ReviewHistorySection({ reviewId }: { reviewId: string }) {
       </div>
 
       {/* Timeline */}
-      <div className="grid grid-cols-3 gap-2 text-xs">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
         {[
           { label: 'Submitted', date: review.created_at },
           { label: 'Reviewed', date: review.reviewed_at },

@@ -93,7 +93,7 @@ export function AiReviewAssistantPanel({ documentId }: { documentId: string }) {
       >
         <div className="flex items-center gap-2">
           <svg
-            className="h-4.5 w-4.5 text-primary-500"
+            className="h-5 w-5 flex-shrink-0 text-primary-500"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
