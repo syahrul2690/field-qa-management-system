@@ -30,6 +30,11 @@ jobs:
           --health-retries 5
     env:
       DATABASE_URL: postgresql://qa_user:qa_password@localhost:5432/field_qa_db
+      # config/index.ts requires these at import time (scopedRepo → slaService
+      # reads the real config), and there is no backend/.env in CI. Test-only
+      # values; production secrets never enter this workflow.
+      JWT_ACCESS_SECRET: ci-test-access-secret
+      JWT_REFRESH_SECRET: ci-test-refresh-secret
 
     steps:
       - name: Checkout repository
