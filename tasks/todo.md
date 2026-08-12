@@ -342,3 +342,13 @@ First green attempt failed at the test phase: `scopedRepo.integration.test.ts`
 imports the real config via `slaService`, which requires `JWT_ACCESS_SECRET` /
 `JWT_REFRESH_SECRET` at module load, and CI has no gitignored `backend/.env`
 to supply them. Added test-only JWT secrets to the CI job env (lesson 26).
+
+### Production incident (2026-08-12): wrong default model slug
+
+First real user message failed with "The assistant could not be reached" —
+backend log: `404 No endpoints found for anthropic/claude-3-5-haiku`. That
+slug is not in OpenRouter's model list (Claude 3.5 Haiku is gone by 2026).
+Fixed on the VPS via `.env` (`AI_CHAT_MODEL=anthropic/claude-haiku-4.5`,
+verified tool-calling + streaming end-to-end with a smoke conversation) and
+the repo default was corrected in config / compose / env.example /
+deployment docs (lesson 27).

@@ -212,3 +212,14 @@ _This file tracks patterns and corrections to prevent repeated mistakes._
   mock `config` (as `agentLoop.test.ts` / `authService.test.ts` do) or make
   sure the CI job env supplies every `required()` var. Test-only secret values
   are fine — production secrets never enter the workflow.
+
+### Lesson 27: Verify model slugs against the provider's live model list before defaulting
+- The chat assistant shipped with `anthropic/claude-3-5-haiku` as the default,
+  which OpenRouter answered with `404 No endpoints found` — the slug either
+  never existed or was deprecated, and the failure surfaced only when a real
+  user sent the first message.
+- Rule: before pinning a model default, query the provider's public model
+  list (OpenRouter: `https://openrouter.ai/api/v1/models`) and confirm the
+  exact slug and that it supports `tools`. Pin the current family explicitly
+  (`anthropic/claude-haiku-4.5`) rather than assuming a product name maps to
+  a slug.

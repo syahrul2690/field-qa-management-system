@@ -58,7 +58,7 @@ export const config = {
     // The assistant drives a tool-calling loop, so the model must follow the
     // `tools` contract reliably and must not emit reasoning into `content`.
     // Reasoning models (qwen3 thinking, for one) fail both and are a poor fit.
-    chatModel: process.env.AI_CHAT_MODEL ?? 'anthropic/claude-3-5-haiku',
+    chatModel: process.env.AI_CHAT_MODEL ?? 'anthropic/claude-haiku-4.5',
     maxTokens: parseInt(process.env.AI_MAX_TOKENS ?? '4096', 10),
     enabled: (process.env.AI_ENABLED ?? 'false') === 'true',
   },
