@@ -352,3 +352,8 @@ Fixed on the VPS via `.env` (`AI_CHAT_MODEL=anthropic/claude-haiku-4.5`,
 verified tool-calling + streaming end-to-end with a smoke conversation) and
 the repo default was corrected in config / compose / env.example /
 deployment docs (lesson 27).
+
+Default model switched to `deepseek/deepseek-v4-flash-0731` (user request,
+2026-08-12). Verified against the live OpenRouter model list (tools: yes),
+smoke-tested on production: tool call + streamed answer with zero reasoning
+leakage into the chat bubble.

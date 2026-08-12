@@ -56,9 +56,10 @@ export const config = {
   ai: {
     openRouterKey: process.env.OPENROUTER_API_KEY ?? '',
     // The assistant drives a tool-calling loop, so the model must follow the
-    // `tools` contract reliably and must not emit reasoning into `content`.
-    // Reasoning models (qwen3 thinking, for one) fail both and are a poor fit.
-    chatModel: process.env.AI_CHAT_MODEL ?? 'anthropic/claude-haiku-4.5',
+    // `tools` contract reliably. Reasoning models are fine: agentLoop consumes
+    // the `reasoning` scratchpad deltas and drops them before they reach the
+    // user. The one hard requirement is that thinking never lands in `content`.
+    chatModel: process.env.AI_CHAT_MODEL ?? 'deepseek/deepseek-v4-flash-0731',
     maxTokens: parseInt(process.env.AI_MAX_TOKENS ?? '4096', 10),
     enabled: (process.env.AI_ENABLED ?? 'false') === 'true',
   },

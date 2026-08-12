@@ -122,7 +122,7 @@ MAX_FILE_SIZE_MB=50
 > variables from here, not from `backend/.env` — that file is gitignored and never
 > reaches the image, so a key set only there leaves the assistant reporting
 > "not configured" in production. Optionally set `AI_CHAT_MODEL` (defaults to
-> `anthropic/claude-haiku-4.5`); it must be a model with reliable tool calling.
+> `deepseek/deepseek-v4-flash-0731`); it must be a model with reliable tool calling.
 >
 > The assistant streams over Server-Sent Events. `frontend/nginx.conf` already sets
 > `proxy_buffering off` for `/api`, but if you terminate TLS at a **host-level
