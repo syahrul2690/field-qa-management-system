@@ -403,3 +403,9 @@ leakage into the chat bubble.
 - Browser verification passed through PIC delegation, Checker/Approver assignment, Reviewer submission, and Checker confirmation.
 - Hardened the Approver action with an explicit button type, guarded submit handler, trimmed notes, and pending-state accessibility.
 - Reproduced the patched flow in Chrome: the success toast appeared, `Approved By` QR was stamped, and the review reached `COMPLETE` with `APPROVED_A` in the disposable QA database.
+
+# 2026-08-19 — Automated GitHub check and merge flow
+
+- [x] Add a post-CI GitHub workflow that checks mergeability and unresolved review threads for `codex/*` branches.
+- [x] Automatically mark passing draft `codex/*` PRs ready and squash-merge them.
+- [x] Create a Codex monitor to report PR status in this thread and handle the current PR while the repository workflow is introduced.

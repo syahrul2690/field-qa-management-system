@@ -1,0 +1,70 @@
+name: Auto Merge Passing Pull Requests
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  auto-merge:
+    name: Merge Passing Pull Request
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.event == 'pull_request' && startsWith(github.event.workflow_run.head_branch, 'codex/') }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Merge the matching pull request
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$HEAD_BRANCH" != codex/* ]]; then
+            echo "Automatic merging is limited to codex/* branches."
+            exit 0
+          fi
+
+          pr_number="$(gh pr list \
+            --repo "$GITHUB_REPOSITORY" \
+            --state open \
+            --head "$HEAD_BRANCH" \
+            --json number \
+            --jq '.[0].number // empty')"
+
+          if [[ -z "$pr_number" ]]; then
+            echo "No open pull request found for $HEAD_BRANCH."
+            exit 0
+          fi
+
+          unresolved_threads="$(gh api graphql \
+            -f query='query($owner:String!,$repo:String!,$number:Int!){repository(owner:$owner,name:$repo){pullRequest(number:$number){reviewThreads(first:100){nodes{isResolved}}}}}' \
+            -F owner="${GITHUB_REPOSITORY%%/*}" \
+            -F repo="${GITHUB_REPOSITORY#*/}" \
+            -F number="$pr_number" \
+            --jq '[.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved == false)] | length')"
+
+          if [[ "$unresolved_threads" != "0" ]]; then
+            echo "PR #$pr_number has $unresolved_threads unresolved review thread(s); merge skipped."
+            exit 1
+          fi
+
+          mergeable="$(gh pr view "$pr_number" --repo "$GITHUB_REPOSITORY" --json mergeable --jq '.mergeable')"
+          if [[ "$mergeable" != "MERGEABLE" ]]; then
+            echo "PR #$pr_number is $mergeable; merge skipped."
+            exit 1
+          fi
+
+          is_draft="$(gh pr view "$pr_number" --repo "$GITHUB_REPOSITORY" --json isDraft --jq '.isDraft')"
+          if [[ "$is_draft" == "true" ]]; then
+            gh pr ready "$pr_number" --repo "$GITHUB_REPOSITORY"
+          fi
+
+          gh pr merge "$pr_number" \
+            --repo "$GITHUB_REPOSITORY" \
+            --squash \
+            --delete-branch \
+            --subject "Auto-merge passing pull request #$pr_number" \
+            --body "Merged automatically after CI passed with no unresolved review threads."
