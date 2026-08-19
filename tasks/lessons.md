@@ -12,6 +12,11 @@ _This file tracks patterns and corrections to prevent repeated mistakes._
 - Business terminology maps the PIC Engineer workflow to the PIC Consultant account in this test scenario.
 - Rule: distinguish business-role labels from implementation enum names and verify the mapping before declaring a role unavailable.
 
+## Session: 2026-08-19 — Push-triggered release automation
+
+- GitHub Actions can react directly to pushes; a fixed-interval Codex heartbeat is not equivalent to a push trigger.
+- Rule: use GitHub workflow events for repository checks and merges, and reserve Codex heartbeats for periodic monitoring only.
+
 ## Session: 2026-08-19 — Feedback plan execution
 - When a permission expansion is intentional, update the existing regression assertion and its
   description in the same change; otherwise the test reports a stale contract rather than a code defect.
