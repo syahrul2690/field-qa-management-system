@@ -26,16 +26,31 @@ export const reviewApi = {
   },
   assignTeam: (
     reviewId: string,
-    data: { reviewer_id: string; checker_id?: string; approver_id?: string },
+    data: { checker_id?: string; approver_id?: string },
   ) => apiClient.post(`/reviews/${reviewId}/assign`, data),
+  delegate: (reviewId: string, engineerId: string, note?: string) =>
+    apiClient.post(`/reviews/${reviewId}/delegate`, { engineer_id: engineerId, note }),
+  delegateCandidates: (reviewId: string) => apiClient.get(`/reviews/${reviewId}/delegate-candidates`),
   verifyQR: (hash: string) => apiClient.get(`/verify/${hash}`),
   notifications: () => apiClient.get('/reviews/notifications'),
   getCommentSheetItems: (reviewId: string) =>
     apiClient.get(`/reviews/${reviewId}/comment-sheet-items`),
   saveCommentSheetItems: (
     reviewId: string,
-    items: Array<{ seq_no: number; pln_comment: string; contractor_response?: string }>,
+    items: Array<{ seq_no: number; pln_comment: string; contractor_response?: string; version?: number }>,
   ) => apiClient.put(`/reviews/${reviewId}/comment-sheet-items`, { items }),
+  listMarkupFiles: (reviewId: string) => apiClient.get(`/reviews/${reviewId}/markup-files`),
+  uploadMarkupFiles: (reviewId: string, stage: 'REVIEW' | 'CHECK' | 'APPROVE', files: File[]) => {
+    const form = new FormData();
+    form.append('stage', stage);
+    files.forEach((file) => form.append('files', file));
+    return apiClient.post(`/reviews/${reviewId}/markup-files`, form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  downloadMarkupFile: (fileId: string) =>
+    apiClient.get(`/reviews/markup-files/${fileId}/download`, { responseType: 'blob' }),
+  deleteMarkupFile: (fileId: string) => apiClient.delete(`/reviews/markup-files/${fileId}`),
   getItpItems: (documentId: string) =>
     apiClient.get(`/documents/${documentId}/itp-items`),
   saveItpItems: (

@@ -87,3 +87,39 @@ export const uploadPdfs = multer({
     files: 20,
   },
 }).array('files', 20);
+
+// ─── Review markup upload (PDF/images, field: files) ─────────────────────────
+// Markups are stored outside the public download contract. The API records
+// metadata and streams them only after an authenticated scope check.
+
+export const uploadReviewMarkup = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => {
+      const dir = 'uploads/review-markup';
+      ensureDir(dir);
+      cb(null, dir);
+    },
+    filename: (_req, file, cb) => {
+      const unique = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+      const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+      cb(null, `${unique}-${safeName}`);
+    },
+  }),
+  fileFilter: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const allowed = [
+      '.pdf', '.png', '.jpg', '.jpeg', '.webp',
+    ];
+    if (allowed.includes(ext) && (
+      file.mimetype === 'application/pdf' || file.mimetype.startsWith('image/')
+    )) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only PDF, PNG, JPG, and WEBP markup files are allowed'));
+    }
+  },
+  limits: {
+    fileSize: 50 * 1024 * 1024,
+    files: 20,
+  },
+}).array('files', 20);

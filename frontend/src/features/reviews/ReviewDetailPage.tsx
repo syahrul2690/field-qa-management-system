@@ -25,6 +25,16 @@ interface CommentSheetItem {
   seq_no: number;
   pln_comment: string;
   contractor_response?: string;
+  version?: number;
+}
+
+interface ReviewMarkupFile {
+  id: string;
+  stage: 'REVIEW' | 'CHECK' | 'APPROVE';
+  file_name: string;
+  file_size: number;
+  mime_type: string;
+  created_at: string;
 }
 
 interface Review {
@@ -40,6 +50,9 @@ interface Review {
   reviewer_id?: string;
   checker_id?: string;
   approver_id?: string;
+  delegated_at?: string | null;
+  delegated_engineer?: { id: string; name: string } | null;
+  delegator?: { id: string; name: string } | null;
   reviewer?: { id: string; name: string };
   checker?: { id: string; name: string };
   approver?: { id: string; name: string };
@@ -148,9 +161,11 @@ function CommentSheetPanel({ reviewId, review, canEdit, role }: CommentSheetPane
     const serverItems: CommentSheetItem[] = itemsData?.data?.data ?? [];
     if (serverItems.length > 0) {
       setLocalItems(serverItems.map(i => ({
+        id: i.id,
         seq_no: i.seq_no,
         pln_comment: i.pln_comment,
         contractor_response: i.contractor_response ?? '',
+        version: i.version,
       })));
     } else {
       // Only seed a blank editable row when the viewer can actually fill it in —
@@ -272,6 +287,9 @@ function CommentSheetPanel({ reviewId, review, canEdit, role }: CommentSheetPane
                 <tr key={idx} className="hover:bg-gray-50 align-top">
                   <td className="px-3 py-2 text-center text-gray-500 font-mono border-r border-gray-100 w-12">
                     {item.seq_no}.
+                    {!!item.version && item.version > 0 && (
+                      <span className="block mt-1 text-[10px] font-sans text-indigo-600" title="This row has edit history">Edited</span>
+                    )}
                   </td>
                   <td className="px-3 py-2 border-r border-gray-100">
                     {canEdit ? (
@@ -350,8 +368,120 @@ function CommentSheetPanel({ reviewId, review, canEdit, role }: CommentSheetPane
           <p className="text-xs text-teal-700">
             {role === 'REVIEWER'
               ? 'As Reviewer, fill in PLN Comments for each point. Click "Save Comment Sheet" to preserve your entries. A QR code for "Prepared By" will be added to the PDF when you submit your review.'
-              : 'As Checker, you can edit the comment sheet rows before confirming your check. A QR code for "Reviewed By" will be added when you confirm.'}
+              : role === 'CHECKER'
+                ? 'As Checker, you can edit the comment sheet rows before confirming your check. A QR code for "Reviewed By" will be added when you confirm.'
+                : 'As Approver, you can make final comment-sheet corrections during approval. Your edits are recorded in the audit history.'}
           </p>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ReviewMarkupPanel({
+  reviewId,
+  role,
+  currentStage,
+}: {
+  reviewId: string;
+  role?: string;
+  currentStage?: string;
+}) {
+  const { addToast } = useUIStore();
+  const queryClient = useQueryClient();
+  const [files, setFiles] = useState<File[]>([]);
+  const stage = role === 'REVIEWER' ? 'REVIEW' : role === 'CHECKER' ? 'CHECK' : 'APPROVE';
+  const canManage = role === 'REVIEWER' || role === 'CHECKER' || role === 'APPROVER';
+  const stageIsOpen = currentStage === stage;
+
+  const { data, isLoading } = useQuery({
+    queryKey: ['review-markup-files', reviewId],
+    queryFn: () => reviewApi.listMarkupFiles(reviewId),
+  });
+  const markupFiles: ReviewMarkupFile[] = data?.data?.data ?? [];
+
+  const uploadMutation = useMutation({
+    mutationFn: () => reviewApi.uploadMarkupFiles(reviewId, stage, files),
+    onSuccess: () => {
+      setFiles([]);
+      queryClient.invalidateQueries({ queryKey: ['review-markup-files', reviewId] });
+      addToast('success', 'Markup files uploaded.');
+    },
+    onError: () => addToast('error', 'Failed to upload markup files.'),
+  });
+
+  const download = async (file: ReviewMarkupFile) => {
+    try {
+      const response = await reviewApi.downloadMarkupFile(file.id);
+      const url = URL.createObjectURL(new Blob([response.data], { type: file.mime_type }));
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = file.file_name;
+      anchor.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      addToast('error', 'Failed to download markup file.');
+    }
+  };
+
+  const deleteMutation = useMutation({
+    mutationFn: (fileId: string) => reviewApi.deleteMarkupFile(fileId),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['review-markup-files', reviewId] }),
+    onError: () => addToast('error', 'Failed to delete markup file.'),
+  });
+
+  return (
+    <div className="card overflow-hidden border-l-4 border-indigo-400">
+      <div className="px-6 py-4 border-b border-gray-100 flex items-center justify-between gap-3">
+        <div>
+          <h2 className="font-semibold text-gray-900">Review Markups</h2>
+          <p className="text-xs text-gray-500 mt-1">Attach annotated PDF or image evidence to the current review stage.</p>
+        </div>
+        <span className="badge bg-indigo-100 text-indigo-700 text-xs">Authenticated downloads</span>
+      </div>
+      {isLoading ? (
+        <div className="py-6 flex justify-center"><LoadingSpinner /></div>
+      ) : (
+        <div className="p-6 space-y-4">
+          {markupFiles.length === 0 ? (
+            <p className="text-sm text-gray-400">No markup files uploaded yet.</p>
+          ) : (
+            <div className="space-y-2">
+              {markupFiles.map((file) => (
+                <div key={file.id} className="flex items-center justify-between gap-3 rounded-md border border-gray-200 px-3 py-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium text-gray-800 truncate">{file.file_name}</p>
+                    <p className="text-xs text-gray-400">{file.stage} · {Math.ceil(file.file_size / 1024)} KB</p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <button type="button" onClick={() => download(file)} className="btn-secondary py-1 px-2 text-xs">Download</button>
+                    {canManage && stageIsOpen && file.stage === stage && (
+                      <button type="button" onClick={() => deleteMutation.mutate(file.id)} className="text-xs text-red-600 hover:text-red-700">Remove</button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {canManage && stageIsOpen && (
+            <div className="flex flex-wrap items-center gap-3 border-t border-gray-100 pt-4">
+              <input
+                type="file"
+                multiple
+                accept=".pdf,.png,.jpg,.jpeg,.webp"
+                onChange={(event) => setFiles(Array.from(event.target.files ?? []))}
+                className="text-sm"
+              />
+              <button
+                type="button"
+                onClick={() => uploadMutation.mutate()}
+                disabled={files.length === 0 || uploadMutation.isPending}
+                className="btn-primary py-1.5 px-3 text-sm"
+              >
+                {uploadMutation.isPending ? 'Uploading…' : `Upload to ${stage}`}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -766,6 +896,7 @@ export function ReviewDetailPage() {
   const [picApproverId, setPicApproverId] = useState('');
 
   const isPicConsultant = user?.role === 'PIC_CONSULTANT';
+  const isPicEngineer = user?.role === 'PIC_ENGINEER';
   const isReviewerRole = user?.role === 'REVIEWER';
 
   const { data: checkersData } = useQuery({
@@ -780,15 +911,15 @@ export function ReviewDetailPage() {
     enabled: isReviewerRole || isPicConsultant,
   });
 
-  const { data: reviewersData } = useQuery({
-    queryKey: ['peers', 'REVIEWER'],
-    queryFn: () => import('../../services/authApi').then(m => m.authApi.listPeers('REVIEWER')),
-    enabled: isPicConsultant,
+  const { data: delegationCandidatesData } = useQuery({
+    queryKey: ['review-delegation-candidates', reviewId],
+    queryFn: () => reviewApi.delegateCandidates(reviewId!),
+    enabled: isPicEngineer && !!reviewId,
   });
 
   const availableCheckers  = checkersData?.data?.data ?? [];
   const availableApprovers = approversData?.data?.data ?? [];
-  const availableReviewers = reviewersData?.data?.data ?? [];
+  const availableDelegationCandidates = delegationCandidatesData?.data?.data ?? [];
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['review', reviewId],
@@ -848,7 +979,7 @@ export function ReviewDetailPage() {
   });
 
   const assignTeamMutation = useMutation({
-    mutationFn: (payload: { reviewer_id: string; checker_id?: string; approver_id?: string }) =>
+    mutationFn: (payload: { checker_id?: string; approver_id?: string }) =>
       reviewApi.assignTeam(reviewId!, payload),
     onSuccess: () => {
       queryClient.refetchQueries({ queryKey: ['review', reviewId] });
@@ -858,6 +989,16 @@ export function ReviewDetailPage() {
       addToast('success', 'Review team assigned successfully.');
     },
     onError: () => addToast('error', 'Failed to assign review team.'),
+  });
+
+  const delegateMutation = useMutation({
+    mutationFn: () => reviewApi.delegate(reviewId!, picReviewerId),
+    onSuccess: () => {
+      queryClient.refetchQueries({ queryKey: ['review', reviewId] });
+      setPicReviewerId('');
+      addToast('success', 'Review delegated to the selected engineer.');
+    },
+    onError: () => addToast('error', 'Failed to delegate review.'),
   });
 
   const review: Review | null = data?.data?.data ?? null;
@@ -880,7 +1021,8 @@ export function ReviewDetailPage() {
   // Comment sheet edit permission
   const canEditSheet =
     (isReviewer && review?.current_stage === 'REVIEW' && isAssignedOrOpenReviewer) ||
-    (isChecker  && review?.current_stage === 'CHECK'  && review?.checker?.id === user?.id);
+    (isChecker  && review?.current_stage === 'CHECK'  && review?.checker?.id === user?.id) ||
+    (isApprover && review?.current_stage === 'APPROVE' && review?.approver?.id === user?.id);
 
   // Show comment sheet panel to all review participants + PIC
   const showCommentSheet =
@@ -1005,6 +1147,14 @@ export function ReviewDetailPage() {
           review={review}
           canEdit={canEditSheet}
           role={user?.role ?? ''}
+        />
+      )}
+
+      {showCommentSheet && reviewId && (
+        <ReviewMarkupPanel
+          reviewId={reviewId}
+          role={user?.role}
+          currentStage={review.current_stage}
         />
       )}
 
@@ -1228,16 +1378,9 @@ export function ReviewDetailPage() {
               </div>
               <p className="text-xs text-gray-400">Team assigned. Reviewer is preparing their comments.</p>
             </div>
-          ) : (
+          ) : review?.delegated_at ? (
             <div className="space-y-4">
-              <div className="grid grid-cols-3 gap-4">
-                <div>
-                  <label className="label">Reviewer <span className="text-red-500">*</span></label>
-                  <select value={picReviewerId} onChange={e => setPicReviewerId(e.target.value)} className="input">
-                    <option value="">Select Reviewer...</option>
-                    {availableReviewers.map((r: any) => <option key={r.id} value={r.id}>{r.name}</option>)}
-                  </select>
-                </div>
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="label">Checker <span className="text-gray-400 text-xs font-normal">(optional)</span></label>
                   <select value={picCheckerId} onChange={e => setPicCheckerId(e.target.value)} className="input">
@@ -1256,11 +1399,10 @@ export function ReviewDetailPage() {
               <div className="flex justify-end pt-2 border-t border-gray-100">
                 <button
                   onClick={() => assignTeamMutation.mutate({
-                    reviewer_id: picReviewerId,
                     ...(picCheckerId  ? { checker_id:  picCheckerId  } : {}),
                     ...(picApproverId ? { approver_id: picApproverId } : {}),
                   })}
-                  disabled={!picReviewerId || assignTeamMutation.isPending}
+                  disabled={(!picCheckerId && !picApproverId) || assignTeamMutation.isPending}
                   className="btn-primary flex items-center gap-2"
                 >
                   {assignTeamMutation.isPending ? <LoadingSpinner size="sm" /> : null}
@@ -1268,7 +1410,27 @@ export function ReviewDetailPage() {
                 </button>
               </div>
             </div>
+          ) : (
+            <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
+              Waiting for the Owner PIC Engineer to delegate this review to an eligible consultant Reviewer.
+            </div>
           )}
+        </div>
+      )}
+
+      {isPicEngineer && review?.current_stage === 'REVIEW' && !review?.delegated_at && (
+        <div className="card p-6 border-l-4 border-blue-400">
+          <h2 className="font-semibold text-gray-900">Delegate Review</h2>
+          <p className="text-xs text-gray-500 mt-1 mb-4">Choose the eligible consultant Reviewer for this owner-unit project. Delegation does not change the original SLA deadline.</p>
+          <div className="flex flex-wrap gap-3">
+            <select value={picReviewerId} onChange={(e) => setPicReviewerId(e.target.value)} className="input flex-1 min-w-[240px]">
+              <option value="">Select eligible Reviewer…</option>
+              {availableDelegationCandidates.map((candidate: any) => <option key={candidate.id} value={candidate.id}>{candidate.name} — {candidate.email}</option>)}
+            </select>
+            <button type="button" onClick={() => delegateMutation.mutate()} disabled={!picReviewerId || delegateMutation.isPending} className="btn-primary">
+              {delegateMutation.isPending ? 'Delegating…' : 'Delegate Review'}
+            </button>
+          </div>
         </div>
       )}
 

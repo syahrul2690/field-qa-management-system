@@ -16,8 +16,14 @@ import {
   assignReviewTeam,
   getCommentSheetItems,
   saveCommentSheetItems,
+  listReviewMarkupFiles,
+  uploadReviewMarkupFiles,
+  downloadReviewMarkupFile,
+  deleteReviewMarkupFile,
+  delegateReviewToEngineer,
+  listDelegationCandidates,
 } from '../controllers/reviewController';
-import { uploadAmsPdf } from '../middlewares/uploadMiddleware';
+import { uploadAmsPdf, uploadReviewMarkup } from '../middlewares/uploadMiddleware';
 
 export const reviewRoutes = Router();
 
@@ -25,7 +31,7 @@ export const reviewRoutes = Router();
 reviewRoutes.get(
   '/notifications',
   authMiddleware,
-  requireRole(Role.REVIEWER, Role.CHECKER, Role.APPROVER, Role.PIC_CONSULTANT, Role.VENDOR),
+  requireRole(Role.REVIEWER, Role.CHECKER, Role.APPROVER, Role.PIC_CONSULTANT, Role.PIC_ENGINEER, Role.VENDOR),
   getNotifications,
 );
 
@@ -33,7 +39,7 @@ reviewRoutes.get(
 reviewRoutes.get(
   '/pending',
   authMiddleware,
-  requireRole(Role.REVIEWER, Role.CHECKER, Role.APPROVER, Role.PIC_CONSULTANT, Role.PIC_PROJECT),
+  requireRole(Role.REVIEWER, Role.CHECKER, Role.APPROVER, Role.PIC_CONSULTANT, Role.PIC_ENGINEER, Role.PIC_PROJECT),
   getPendingReviews,
 );
 
@@ -46,12 +52,25 @@ reviewRoutes.post('/', authMiddleware, requireRole(Role.VENDOR), submitForReview
 // GET /reviews/:reviewId
 reviewRoutes.get('/:reviewId', authMiddleware, getReviewById);
 
-// POST /reviews/:reviewId/assign — PIC_CONSULTANT assigns reviewer (+ optional checker/approver)
+// POST /reviews/:reviewId/assign — PIC_CONSULTANT assigns checker/approver
 reviewRoutes.post(
   '/:reviewId/assign',
   authMiddleware,
   requireRole(Role.PIC_CONSULTANT),
   assignReviewTeam,
+);
+reviewRoutes.get(
+  '/:reviewId/delegate-candidates',
+  authMiddleware,
+  requireRole(Role.PIC_ENGINEER),
+  listDelegationCandidates,
+);
+
+reviewRoutes.post(
+  '/:reviewId/delegate',
+  authMiddleware,
+  requireRole(Role.PIC_ENGINEER),
+  delegateReviewToEngineer,
 );
 
 // POST /reviews/:reviewId/review
@@ -84,11 +103,28 @@ reviewRoutes.get('/:reviewId/comment-sheet', authMiddleware, downloadCommentShee
 // GET /reviews/:reviewId/comment-sheet-items
 reviewRoutes.get('/:reviewId/comment-sheet-items', authMiddleware, getCommentSheetItems);
 
-// PUT /reviews/:reviewId/comment-sheet-items — REVIEWER or CHECKER
+// Review markup files — all reads are authenticated and project-scoped.
+reviewRoutes.get('/:reviewId/markup-files', authMiddleware, listReviewMarkupFiles);
+reviewRoutes.post(
+  '/:reviewId/markup-files',
+  authMiddleware,
+  requireRole(Role.REVIEWER, Role.CHECKER, Role.APPROVER),
+  (req, res, next) => uploadReviewMarkup(req, res, (err) => err ? next(err) : next()),
+  uploadReviewMarkupFiles,
+);
+reviewRoutes.get('/markup-files/:fileId/download', authMiddleware, downloadReviewMarkupFile);
+reviewRoutes.delete(
+  '/markup-files/:fileId',
+  authMiddleware,
+  requireRole(Role.REVIEWER, Role.CHECKER, Role.APPROVER),
+  deleteReviewMarkupFile,
+);
+
+// PUT /reviews/:reviewId/comment-sheet-items — assigned stage owner
 reviewRoutes.put(
   '/:reviewId/comment-sheet-items',
   authMiddleware,
-  requireRole(Role.REVIEWER, Role.CHECKER),
+  requireRole(Role.REVIEWER, Role.CHECKER, Role.APPROVER),
   saveCommentSheetItems,
 );
 

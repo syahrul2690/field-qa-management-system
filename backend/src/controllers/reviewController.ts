@@ -7,6 +7,11 @@ import { generateCommentSheet } from '../utils/pdfEngine/commentSheetGenerator';
 import path from 'path';
 import fs from 'fs';
 
+function scopeUser(req: Request) {
+  if (!req.user) throw new AppError('Unauthorized', 401);
+  return req.user;
+}
+
 // POST /reviews
 // Body: { document_id }
 // Requires VENDOR role
@@ -119,14 +124,10 @@ export const getReviewById = asyncHandler(async (req: Request, res: Response) =>
 export const assignReviewTeam = asyncHandler(async (req: Request, res: Response) => {
   const { reviewId } = req.params;
   const { reviewer_id, checker_id, approver_id } = req.body as {
-    reviewer_id: string;
+    reviewer_id?: string;
     checker_id?: string;
     approver_id?: string;
   };
-
-  if (!reviewer_id) {
-    throw new AppError('reviewer_id is required', 400);
-  }
 
   const result = await reviewService.assignReviewTeam(reviewId, req.user!.id, {
     reviewer_id,
@@ -135,6 +136,22 @@ export const assignReviewTeam = asyncHandler(async (req: Request, res: Response)
   });
 
   res.json({ success: true, data: result });
+});
+
+// POST /reviews/:reviewId/delegate
+export const delegateReviewToEngineer = asyncHandler(async (req: Request, res: Response) => {
+  const { engineer_id, note } = req.body as { engineer_id?: string; note?: string };
+  if (!engineer_id) throw new AppError('engineer_id is required', 400);
+  const result = await reviewService.delegateReview(req.params.reviewId, req.user!.id, {
+    engineer_id,
+    note,
+  });
+  res.json({ success: true, data: result });
+});
+
+export const listDelegationCandidates = asyncHandler(async (req: Request, res: Response) => {
+  const data = await reviewService.listDelegationCandidates(req.params.reviewId, req.user!.id);
+  res.json({ success: true, data });
 });
 
 // POST /reviews/:reviewId/ams-letter
@@ -161,6 +178,39 @@ export const uploadAmsLetter = asyncHandler(async (req: Request, res: Response) 
   });
 
   res.json({ success: true, data: result });
+});
+
+// GET /reviews/:reviewId/markup-files
+export const listReviewMarkupFiles = asyncHandler(async (req: Request, res: Response) => {
+  const files = await reviewService.listReviewMarkupFiles(req.params.reviewId, scopeUser(req));
+  res.json({ success: true, data: files });
+});
+
+// POST /reviews/:reviewId/markup-files — multipart field: files
+export const uploadReviewMarkupFiles = asyncHandler(async (req: Request, res: Response) => {
+  const files = (req.files as Express.Multer.File[] | undefined) ?? [];
+  const stage = typeof req.body.stage === 'string' ? req.body.stage : '';
+  const result = await reviewService.uploadReviewMarkupFiles(
+    req.params.reviewId,
+    scopeUser(req),
+    stage,
+    files,
+  );
+  res.status(201).json({ success: true, data: result });
+});
+
+// GET /reviews/markup-files/:fileId/download — authenticated, scoped stream
+export const downloadReviewMarkupFile = asyncHandler(async (req: Request, res: Response) => {
+  const file = await reviewService.getReviewMarkupFile(req.params.fileId, scopeUser(req));
+  res.setHeader('Content-Type', file.mime_type);
+  res.setHeader('Content-Disposition', `attachment; filename="${file.file_name.replace(/"/g, '')}"`);
+  res.sendFile(file.absolutePath);
+});
+
+// DELETE /reviews/markup-files/:fileId
+export const deleteReviewMarkupFile = asyncHandler(async (req: Request, res: Response) => {
+  await reviewService.deleteReviewMarkupFile(req.params.fileId, scopeUser(req));
+  res.json({ success: true });
 });
 
 // GET /reviews/pending
@@ -217,6 +267,7 @@ export const downloadCommentSheet = asyncHandler(async (req: Request, res: Respo
     seq_no:              i.seq_no,
     pln_comment:         i.pln_comment,
     contractor_response: i.contractor_response ?? undefined,
+    is_edited:           i.version > 0,
   }));
 
   await generateCommentSheet(reviewData, sheetItems, outputPath);
@@ -240,7 +291,7 @@ export const getCommentSheetItems = asyncHandler(async (req: Request, res: Respo
 export const saveCommentSheetItems = asyncHandler(async (req: Request, res: Response) => {
   const { reviewId } = req.params;
   const { items = [] } = req.body as {
-    items: Array<{ seq_no: number; pln_comment: string; contractor_response?: string }>;
+    items: Array<{ seq_no: number; pln_comment: string; contractor_response?: string; version?: number }>;
   };
 
   const result = await reviewService.saveCommentSheetItems(

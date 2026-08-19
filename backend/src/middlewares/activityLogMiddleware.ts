@@ -25,6 +25,7 @@ const ROUTE_ACTION_MAP: Array<{
   { method: 'POST', pattern: /\/documents\/.*\/revisions/, action: ActivityAction.DOCUMENT_REVISED, entityType: 'Document' },
   { method: 'POST', pattern: /\/reviews$/, action: ActivityAction.REVIEW_SUBMITTED, entityType: 'DocumentReview' },
   { method: 'POST', pattern: /\/reviews\/.*\/review$/, action: ActivityAction.REVIEW_COMMENTED, entityType: 'DocumentReview' },
+  { method: 'POST', pattern: /\/reviews\/.*\/delegate$/, action: ActivityAction.REVIEW_DELEGATED, entityType: 'DocumentReview' },
   { method: 'POST', pattern: /\/reviews\/.*\/check$/, action: ActivityAction.REVIEW_CHECKED, entityType: 'DocumentReview' },
   { method: 'POST', pattern: /\/reviews\/.*\/approve$/, action: ActivityAction.REVIEW_APPROVED, entityType: 'DocumentReview' },
 ];

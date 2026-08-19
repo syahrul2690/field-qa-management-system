@@ -1,4 +1,4 @@
-import { InstitutionType, ProjectType, ProjectUrgency } from '@prisma/client';
+import { InstitutionType, ProjectType, ProjectUrgency, Role, UserStatus } from '@prisma/client';
 import { prisma } from '../config/database';
 import { AppError } from '../utils/AppError';
 
@@ -173,6 +173,20 @@ export async function getProjectById(
           vendor_institution: { select: { id: true, name: true, type: true } },
         },
       },
+      consultant_pics: {
+        include: {
+          consultant: {
+            select: {
+              id: true,
+              name: true,
+              email: true,
+              institution: { select: { id: true, name: true } },
+              unit: { select: { id: true, name: true } },
+            },
+          },
+        },
+        orderBy: { assigned_at: 'asc' },
+      },
     },
   });
 
@@ -338,6 +352,91 @@ export async function removeVendor(projectId: string, vendorInstitutionId: strin
   });
 }
 
+// ── Project-scoped consultant PICs ──────────────────────────────────────────
+
+export async function listConsultantPics(projectId: string) {
+  const project = await prisma.project.findUnique({ where: { id: projectId } });
+  if (!project) throw new AppError('Project not found', 404);
+
+  return prisma.projectConsultantPic.findMany({
+    where: { project_id: projectId },
+    include: {
+      consultant: {
+        select: {
+          id: true,
+          name: true,
+          email: true,
+          institution: { select: { id: true, name: true } },
+          unit: { select: { id: true, name: true } },
+        },
+      },
+    },
+    orderBy: { assigned_at: 'asc' },
+  });
+}
+
+export async function listConsultantPicCandidates(projectId: string) {
+  const project = await prisma.project.findUnique({ where: { id: projectId } });
+  if (!project) throw new AppError('Project not found', 404);
+
+  return prisma.user.findMany({
+    where: {
+      role: Role.PIC_CONSULTANT,
+      status: UserStatus.APPROVED,
+      institution: { type: InstitutionType.CONSULTANT },
+      project_consultant_pics: { none: { project_id: projectId } },
+    },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      institution: { select: { id: true, name: true } },
+      unit: { select: { id: true, name: true } },
+    },
+    orderBy: { name: 'asc' },
+  });
+}
+
+export async function assignConsultantPic(
+  projectId: string,
+  consultantId: string,
+  assignedBy: string,
+) {
+  const [project, consultant] = await Promise.all([
+    prisma.project.findUnique({ where: { id: projectId } }),
+    prisma.user.findUnique({ where: { id: consultantId }, include: { institution: true } }),
+  ]);
+  if (!project) throw new AppError('Project not found', 404);
+  if (!consultant || consultant.status !== 'APPROVED') {
+    throw new AppError('Consultant user not found or not approved', 404);
+  }
+  if (consultant.role !== Role.PIC_CONSULTANT || consultant.institution.type !== InstitutionType.CONSULTANT) {
+    throw new AppError('Selected user must be an approved PIC Consultant', 400);
+  }
+
+  return prisma.projectConsultantPic.upsert({
+    where: { project_id_consultant_id: { project_id: projectId, consultant_id: consultantId } },
+    create: { project_id: projectId, consultant_id: consultantId, assigned_by: assignedBy },
+    update: { assigned_by: assignedBy, assigned_at: new Date() },
+    include: { consultant: { select: { id: true, name: true, email: true } } },
+  });
+}
+
+export async function removeConsultantPic(projectId: string, consultantId: string) {
+  const existing = await prisma.projectConsultantPic.findUnique({
+    where: { project_id_consultant_id: { project_id: projectId, consultant_id: consultantId } },
+  });
+  if (!existing) throw new AppError('Consultant PIC assignment not found', 404);
+  return prisma.projectConsultantPic.delete({ where: { id: existing.id } });
+}
+
+export async function assertProjectConsultantPic(projectId: string, consultantId: string) {
+  const assignment = await prisma.projectConsultantPic.findUnique({
+    where: { project_id_consultant_id: { project_id: projectId, consultant_id: consultantId } },
+  });
+  if (!assignment) throw new AppError('You are not assigned as PIC Consultant for this project', 403);
+}
+
 // ── Dashboard aggregation ─────────────────────────────────────────────────────
 
 export async function getDashboardData(filters: {
@@ -393,6 +492,16 @@ export async function getDashboardData(filters: {
     for (const doc of item.documents) {
       docsByProject[item.project_id].push(doc as DocInfo);
     }
+  }
+
+  const supersededDocs = await prisma.document.findMany({
+    where: { is_current: false, status: 'SUPERSEDED', boq_item: { project_id: { in: projectIds } } },
+    select: { boq_item: { select: { project_id: true } } },
+  });
+  const supersededByProject: Record<string, number> = {};
+  for (const doc of supersededDocs) {
+    const projectId = doc.boq_item.project_id;
+    supersededByProject[projectId] = (supersededByProject[projectId] ?? 0) + 1;
   }
 
   // Overdue reviews per project
@@ -475,6 +584,7 @@ export async function getDashboardData(filters: {
       remaining_docs: remainingDocs,
       completion_rate: completionRate,
       doc_summary: statusMap,
+      superseded_revisions: supersededByProject[p.id] ?? 0,
       overdue_reviews: overdue,
     };
   });

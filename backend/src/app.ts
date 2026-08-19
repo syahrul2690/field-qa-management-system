@@ -31,6 +31,11 @@ export function createApp(): express.Application {
   app.use(express.urlencoded({ extended: true }));
 
   // Static files for uploads
+  // Review markups are stored under the uploads root for operational
+  // simplicity, but must never be reachable through the public static route.
+  app.use('/uploads/review-markup', (_req, res) => {
+    res.status(404).json({ success: false, message: 'Not found' });
+  });
   app.use('/uploads', express.static(path.join(process.cwd(), config.upload.dir)));
 
   // Global rate limiter

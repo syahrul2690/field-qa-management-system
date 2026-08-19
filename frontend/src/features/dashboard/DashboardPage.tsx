@@ -412,6 +412,16 @@ export function DashboardPage() {
 
   const dashboard = data?.data?.data as DashboardData | undefined;
 
+  const handleExport = async () => {
+    const response = await projectApi.dashboardExport();
+    const url = URL.createObjectURL(response.data);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'field-qa-dashboard.xlsx';
+    anchor.click();
+    URL.revokeObjectURL(url);
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-20">
@@ -438,6 +448,16 @@ export function DashboardPage() {
 
   return (
     <div className="space-y-6 w-full">
+
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
+          <p className="text-sm text-gray-500">Current project and review performance</p>
+        </div>
+        <button type="button" onClick={handleExport} className="btn-secondary">
+          Export Excel
+        </button>
+      </div>
 
       {/* Summary stats */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">

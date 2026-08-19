@@ -1,10 +1,12 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
 import { documentApi } from '../../services/documentApi';
 import { reviewApi } from '../../services/reviewApi';
 import { StatusBadge } from '../../components/ui/StatusBadge';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
+import { useAuthStore } from '../../store/authStore';
+import { useUIStore } from '../../store/uiStore';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -163,6 +165,18 @@ function ReviewHistorySection({ reviewId }: { reviewId: string }) {
 
 function DocumentVersionCard({ doc, isLatest }: { doc: any; isLatest: boolean }) {
   const [open, setOpen] = useState(isLatest);
+  const { user } = useAuthStore();
+  const { addToast } = useUIStore();
+  const queryClient = useQueryClient();
+  const submitMutation = useMutation({
+    mutationFn: () => documentApi.submit(doc.id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['doc-history'] });
+      queryClient.invalidateQueries({ queryKey: ['notifications'] });
+      addToast('success', 'Draft submitted for review.');
+    },
+    onError: () => addToast('error', 'Failed to submit draft for review.'),
+  });
 
   const lastReview = doc.reviews?.[0] ?? null;
 
@@ -211,6 +225,22 @@ function DocumentVersionCard({ doc, isLatest }: { doc: any; isLatest: boolean })
 
           {!doc.files?.length && !lastReview && (
             <p className="text-xs text-gray-400 italic pt-2">No files or review data attached to this revision.</p>
+          )}
+          {isLatest && doc.status === 'DRAFT' && user?.role === 'VENDOR' && (
+            <div className="flex items-center justify-between gap-3 rounded-md border border-blue-200 bg-blue-50 px-3 py-2">
+              <div>
+                <p className="text-xs font-semibold text-blue-800">Draft is ready</p>
+                <p className="text-xs text-blue-600 mt-0.5">Submit when the files and ITP rows are complete.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => submitMutation.mutate()}
+                disabled={submitMutation.isPending}
+                className="btn-primary py-1.5 px-3 text-xs"
+              >
+                {submitMutation.isPending ? 'Submitting…' : 'Submit for Review'}
+              </button>
+            </div>
           )}
         </div>
       )}
@@ -285,6 +315,12 @@ export function DocumentDetailModal({
 
           {/* Body */}
           <div className="flex-1 overflow-y-auto px-6 py-5">
+            {currentDoc?.boq_items?.length > 1 && (
+              <div className="mb-4 rounded-md border border-blue-200 bg-blue-50 px-3 py-2">
+                <p className="text-xs font-semibold text-blue-800">Covers {currentDoc.boq_items.length} BoQ items</p>
+                <p className="text-xs text-blue-600 mt-1">{currentDoc.boq_items.map((item: any) => `${item.item_code} — ${item.title}`).join(' · ')}</p>
+              </div>
+            )}
             {histLoading ? (
               <div className="flex items-center justify-center py-12">
                 <LoadingSpinner size="lg" />

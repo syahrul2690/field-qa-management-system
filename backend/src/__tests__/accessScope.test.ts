@@ -88,25 +88,45 @@ describe('nested scope builders', () => {
 
   it('walks Document up through its boq item', () => {
     expect(buildDocumentScopeWhere(vendor)).toEqual({
-      boq_item: { project: VENDOR_FILTER },
+      OR: [
+        { boq_item: { project: VENDOR_FILTER } },
+        { boq_item_links: { some: { boq_item: { project: VENDOR_FILTER } } } },
+      ],
     });
   });
 
   it('walks DocumentReview up through its document', () => {
     expect(buildReviewScopeWhere(vendor)).toEqual({
-      document: { boq_item: { project: VENDOR_FILTER } },
+      document: {
+        OR: [
+          { boq_item: { project: VENDOR_FILTER } },
+          { boq_item_links: { some: { boq_item: { project: VENDOR_FILTER } } } },
+        ],
+      },
     });
   });
 
   it('walks ItpItem up through its document', () => {
     expect(buildItpItemScopeWhere(vendor)).toEqual({
-      document: { boq_item: { project: VENDOR_FILTER } },
+      document: {
+        OR: [
+          { boq_item: { project: VENDOR_FILTER } },
+          { boq_item_links: { some: { boq_item: { project: VENDOR_FILTER } } } },
+        ],
+      },
     });
   });
 
   it('walks CommentSheetItem up through its review', () => {
     expect(buildCommentSheetItemScopeWhere(vendor)).toEqual({
-      review: { document: { boq_item: { project: VENDOR_FILTER } } },
+      review: {
+        document: {
+          OR: [
+            { boq_item: { project: VENDOR_FILTER } },
+            { boq_item_links: { some: { boq_item: { project: VENDOR_FILTER } } } },
+          ],
+        },
+      },
     });
   });
 
@@ -114,7 +134,14 @@ describe('nested scope builders', () => {
   // which Prisma treats as a no-op rather than as "relation must exist".
   it('produces empty leaf filters for unrestricted users', () => {
     expect(buildCommentSheetItemScopeWhere(owner)).toEqual({
-      review: { document: { boq_item: { project: {} } } },
+      review: {
+        document: {
+          OR: [
+            { boq_item: { project: {} } },
+            { boq_item_links: { some: { boq_item: { project: {} } } } },
+          ],
+        },
+      },
     });
   });
 });

@@ -43,7 +43,7 @@ export function DocumentReviseForm({
   const reviseMutation = useMutation({
     mutationFn: (fd: FormData) => documentApi.revise(documentId, fd),
     onSuccess: () => {
-      addToast('success', 'Revised document submitted successfully.');
+      addToast('success', 'Revision draft created. Review the copied ITP rows, then submit when ready.');
       queryClient.invalidateQueries({ queryKey: ['documents', boqItemId, section] });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
       handleClose();
@@ -98,7 +98,7 @@ export function DocumentReviseForm({
           <p className="text-sm font-semibold text-amber-800">Status C — Revise & Resubmit</p>
           <p className="text-xs text-amber-600 mt-0.5">
             This document was returned for revision. Please upload the corrected version below.
-            A new revision will be created and submitted for review.
+            A new editable draft will be created with the prior ITP rows copied forward. You can submit it for review when the package is ready.
           </p>
         </div>
       </div>

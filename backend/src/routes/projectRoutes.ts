@@ -11,7 +11,12 @@ import {
   listAmendments,
   assignVendor,
   removeVendor,
+  listConsultantPics,
+  listConsultantPicCandidates,
+  assignConsultantPic,
+  removeConsultantPic,
   getDashboard,
+  exportDashboard,
   getApprovedDocumentsByProject,
 } from '../controllers/projectController';
 
@@ -28,6 +33,7 @@ projectRoutes.post(
 
 // GET /projects/dashboard — aggregated dashboard data (must be before /:id)
 projectRoutes.get('/dashboard', authMiddleware, getDashboard);
+projectRoutes.get('/dashboard/export', authMiddleware, exportDashboard);
 
 // GET /projects — list projects (filtered by institution type)
 projectRoutes.get('/', authMiddleware, listProjects);
@@ -64,6 +70,22 @@ projectRoutes.delete(
   authMiddleware,
   requireRole(Role.PIC_PROJECT),
   removeVendor
+);
+
+// Project-scoped consultant PIC management.
+projectRoutes.get('/:id/consultant-pics', authMiddleware, listConsultantPics);
+projectRoutes.get('/:id/consultant-pic-candidates', authMiddleware, listConsultantPicCandidates);
+projectRoutes.post(
+  '/:id/consultant-pics',
+  authMiddleware,
+  requireRole(Role.PIC_PROJECT, Role.ADMIN),
+  assignConsultantPic,
+);
+projectRoutes.delete(
+  '/:id/consultant-pics/:consultantId',
+  authMiddleware,
+  requireRole(Role.PIC_PROJECT, Role.ADMIN),
+  removeConsultantPic,
 );
 // GET /projects/:id/approved-documents — list approved docs for a project
 projectRoutes.get('/:id/approved-documents', authMiddleware, getApprovedDocumentsByProject);

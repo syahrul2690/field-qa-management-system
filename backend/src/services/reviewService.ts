@@ -1,11 +1,14 @@
 import { prisma } from '../config/database';
 import { AppError } from '../utils/AppError';
-import { ReviewStatus, DocumentSection, Role, type ItpCategory, type InspectionLevel, type ItpPhase } from '@prisma/client';
+import { ReviewStatus, DocumentSection, Role, ReviewMarkupStage, type ItpCategory, type InspectionLevel, type ItpPhase } from '@prisma/client';
 import { calculateSlaDeadline, isOverdue, getCurrentStage } from './slaService';
 import { generateCommentSheet } from '../utils/pdfEngine/commentSheetGenerator';
 import { config } from '../config';
 import path from 'path';
 import fs from 'fs';
+import { buildReviewScopeWhere, type ScopeUser } from './accessScopeService';
+import { getFilePath } from './fileStorageService';
+import { assertProjectConsultantPic } from './projectService';
 
 // ── submitForReview ──────────────────────────────────────────────────────────
 
@@ -17,6 +20,10 @@ export async function submitForReview(documentId: string, actorId: string) {
 
   if (!document) {
     throw new AppError('Document not found', 404);
+  }
+
+  if (document.uploaded_by !== actorId) {
+    throw new AppError('Only the document uploader can submit it for review', 403);
   }
 
   const allowedStatuses: ReviewStatus[] = [
@@ -60,34 +67,121 @@ export async function submitForReview(documentId: string, actorId: string) {
   return review;
 }
 
+// ── delegateReview ───────────────────────────────────────────────────────────
+// Owner-side PIC_ENGINEER assigns the consultant reviewer before the review
+// stage can start. This is a gate, not an approval step.
+
+export async function delegateReview(
+  reviewId: string,
+  actorId: string,
+  data: { engineer_id: string; note?: string },
+) {
+  const [review, actor, engineer] = await Promise.all([
+    prisma.documentReview.findUnique({
+      where: { id: reviewId },
+      include: { document: { include: { boq_item: { include: { project: { include: { owner_unit: true } } } } } } },
+    }),
+    prisma.user.findUnique({ where: { id: actorId }, include: { institution: true } }),
+    prisma.user.findUnique({ where: { id: data.engineer_id }, include: { unit: true, institution: true } }),
+  ]);
+  if (!review) throw new AppError('Review not found', 404);
+  if (!actor || actor.role !== Role.PIC_ENGINEER || actor.institution.type !== 'OWNER') {
+    throw new AppError('Only an OWNER PIC Engineer can delegate reviews', 403);
+  }
+  if (review.document.boq_item.project.owner_unit_id !== actor.unit_id) {
+    throw new AppError('You can only delegate reviews in your owner-unit scope', 403);
+  }
+  if (review.reviewed_at) throw new AppError('Review cannot be re-delegated after review begins', 400);
+  if (!engineer || engineer.status !== 'APPROVED' || engineer.role !== Role.REVIEWER || engineer.institution.type !== 'CONSULTANT') {
+    throw new AppError('Selected engineer must be an approved consultant Reviewer', 400);
+  }
+
+  const section = review.document.section;
+  if ((section === DocumentSection.FIELD_ITP || section === DocumentSection.PROCEDURE) && engineer.unit.level !== 1) {
+    throw new AppError('Reviewer for FIELD_ITP or PROCEDURE must be from a Child unit', 403);
+  }
+  if (section === DocumentSection.WORK_METHOD && engineer.unit.level !== 2) {
+    throw new AppError('Reviewer for WORK_METHOD must be from a Grandchild/Project Site Team unit', 403);
+  }
+
+  const updated = await prisma.documentReview.updateMany({
+    where: { id: reviewId, version: review.version, reviewed_at: null },
+    data: {
+      reviewer_id: engineer.id,
+      delegated_engineer_id: engineer.id,
+      delegated_by: actorId,
+      delegated_at: new Date(),
+      version: review.version + 1,
+    },
+  });
+  if (updated.count === 0) throw new AppError('Concurrent modification. Please refresh and retry.', 409);
+
+  return prisma.documentReview.findUnique({
+    where: { id: reviewId },
+    include: {
+      reviewer: { select: { id: true, name: true } },
+      delegated_engineer: { select: { id: true, name: true } },
+      delegator: { select: { id: true, name: true } },
+    },
+  });
+}
+
+export async function listDelegationCandidates(reviewId: string, actorId: string) {
+  const review = await prisma.documentReview.findUnique({
+    where: { id: reviewId },
+    include: { document: { include: { boq_item: { include: { project: true } } } } },
+  });
+  const actor = await prisma.user.findUnique({ where: { id: actorId }, include: { institution: true } });
+  if (!review) throw new AppError('Review not found', 404);
+  if (!actor || actor.role !== Role.PIC_ENGINEER || actor.institution.type !== 'OWNER' || review.document.boq_item.project.owner_unit_id !== actor.unit_id) {
+    throw new AppError('Insufficient delegation scope', 403);
+  }
+  const unitLevel = review.document.section === DocumentSection.WORK_METHOD ? 2 : 1;
+  return prisma.user.findMany({
+    where: {
+      role: Role.REVIEWER,
+      status: 'APPROVED',
+      institution: { type: 'CONSULTANT' },
+      unit: { level: unitLevel },
+    },
+    select: { id: true, name: true, email: true, unit: { select: { id: true, name: true, level: true } }, institution: { select: { id: true, name: true } } },
+    orderBy: { name: 'asc' },
+  });
+}
+
 // ── assignReviewTeam ─────────────────────────────────────────────────────────
-// Called by PIC_CONSULTANT to assign reviewer (and optionally checker + approver)
-// before the reviewer submits their comments.
+// Called by PIC_CONSULTANT to assign checker and approver after delegation.
 
 export async function assignReviewTeam(
   reviewId: string,
   actorId: string,
   data: {
-    reviewer_id: string;
+    reviewer_id?: string;
     checker_id?: string;
     approver_id?: string;
   },
 ) {
-  const [review, actor, reviewer] = await Promise.all([
-    prisma.documentReview.findUnique({ where: { id: reviewId } }),
+  const [review, actor] = await Promise.all([
+    prisma.documentReview.findUnique({
+      where: { id: reviewId },
+      include: { document: { include: { boq_item: { select: { project_id: true } } } } },
+    }),
     prisma.user.findUnique({ where: { id: actorId } }),
-    prisma.user.findUnique({ where: { id: data.reviewer_id } }),
   ]);
 
   if (!review) throw new AppError('Review not found', 404);
   if (!actor || actor.role !== Role.PIC_CONSULTANT) {
     throw new AppError('Only PIC Consultant can assign a review team.', 403);
   }
+  await assertProjectConsultantPic(review.document.boq_item.project_id, actorId);
+  if (data.reviewer_id) {
+    throw new AppError('PIC Consultant no longer assigns the Reviewer; use the PIC Engineer delegation gate.', 403);
+  }
   if (review.reviewed_at) {
     throw new AppError('Reviewer has already submitted comments — team cannot be reassigned.', 400);
   }
-  if (!reviewer || reviewer.role !== Role.REVIEWER) {
-    throw new AppError('Selected user is not a Reviewer.', 400);
+  if (!review.reviewer_id) {
+    throw new AppError('Reviewer must be assigned by PIC Engineer before team setup.', 400);
   }
 
   if (data.checker_id) {
@@ -106,7 +200,6 @@ export async function assignReviewTeam(
   return prisma.documentReview.update({
     where: { id: reviewId },
     data: {
-      reviewer_id: data.reviewer_id,
       ...(data.checker_id  ? { checker_id:  data.checker_id  } : {}),
       ...(data.approver_id ? { approver_id: data.approver_id } : {}),
     },
@@ -117,6 +210,142 @@ export async function assignReviewTeam(
       document: { include: { boq_item: { include: { project: true } } } },
     },
   });
+}
+
+// ── review markup files ─────────────────────────────────────────────────────
+
+function assertMarkupStage(stage: string): ReviewMarkupStage {
+  if (!Object.values(ReviewMarkupStage).includes(stage as ReviewMarkupStage)) {
+    throw new AppError('stage must be REVIEW, CHECK, or APPROVE', 400);
+  }
+  return stage as ReviewMarkupStage;
+}
+
+async function getScopedMarkupReview(reviewId: string, actor: ScopeUser) {
+  const review = await prisma.documentReview.findFirst({
+    where: { id: reviewId, ...buildReviewScopeWhere(actor) },
+    select: {
+      id: true,
+      reviewer_id: true,
+      checker_id: true,
+      approver_id: true,
+      final_status: true,
+    },
+  });
+  if (!review) throw new AppError('Review not found', 404);
+  return review;
+}
+
+function assertMarkupOwner(review: {
+  reviewer_id: string | null;
+  checker_id: string | null;
+  approver_id: string | null;
+}, actor: ScopeUser, stage: ReviewMarkupStage): void {
+  const assignedId = stage === ReviewMarkupStage.REVIEW
+    ? review.reviewer_id
+    : stage === ReviewMarkupStage.CHECK
+      ? review.checker_id
+      : review.approver_id;
+  const allowedRole = stage === ReviewMarkupStage.REVIEW
+    ? Role.REVIEWER
+    : stage === ReviewMarkupStage.CHECK
+      ? Role.CHECKER
+      : Role.APPROVER;
+  if (actor.role !== allowedRole || assignedId !== actor.id) {
+    throw new AppError(`Only the assigned ${stage.toLowerCase()} user can manage markup files`, 403);
+  }
+}
+
+export async function listReviewMarkupFiles(reviewId: string, actor: ScopeUser) {
+  await getScopedMarkupReview(reviewId, actor);
+  return prisma.reviewMarkupFile.findMany({
+    where: { review_id: reviewId },
+    orderBy: { created_at: 'asc' },
+    select: {
+      id: true,
+      review_id: true,
+      uploaded_by: true,
+      stage: true,
+      file_name: true,
+      file_size: true,
+      mime_type: true,
+      created_at: true,
+    },
+  });
+}
+
+export async function uploadReviewMarkupFiles(
+  reviewId: string,
+  actor: ScopeUser,
+  stageInput: string,
+  files: Express.Multer.File[],
+) {
+  const stage = assertMarkupStage(stageInput);
+  const review = await getScopedMarkupReview(reviewId, actor);
+  assertMarkupOwner(review, actor, stage);
+  if (review.final_status) throw new AppError('Markup files are locked after final approval', 400);
+  if (files.length === 0) throw new AppError('At least one markup file is required', 400);
+
+  const stored = [] as Array<{
+    id: string;
+    review_id: string;
+    uploaded_by: string;
+    stage: ReviewMarkupStage;
+    file_name: string;
+    file_path: string;
+    file_size: number;
+    mime_type: string;
+  }>;
+  try {
+    for (const file of files) {
+      const relativeDir = path.join('review-markup', reviewId);
+      const absoluteDir = path.resolve(config.upload.dir, relativeDir);
+      fs.mkdirSync(absoluteDir, { recursive: true });
+      const fileName = path.basename(file.path);
+      const destination = path.join(absoluteDir, fileName);
+      fs.renameSync(file.path, destination);
+      stored.push({
+        id: '',
+        review_id: reviewId,
+        uploaded_by: actor.id,
+        stage,
+        file_name: file.originalname,
+        file_path: path.join(relativeDir, fileName),
+        file_size: file.size,
+        mime_type: file.mimetype,
+      });
+    }
+  } catch (error) {
+    for (const file of stored) {
+      try { fs.unlinkSync(getFilePath(file.file_path)); } catch { /* best effort */ }
+    }
+    throw error;
+  }
+
+  await prisma.reviewMarkupFile.createMany({ data: stored.map(({ id: _id, ...file }) => file) });
+  return listReviewMarkupFiles(reviewId, actor);
+}
+
+export async function deleteReviewMarkupFile(fileId: string, actor: ScopeUser) {
+  const file = await prisma.reviewMarkupFile.findFirst({
+    where: { id: fileId, review: buildReviewScopeWhere(actor) },
+  });
+  if (!file) throw new AppError('Markup file not found', 404);
+  const review = await getScopedMarkupReview(file.review_id, actor);
+  assertMarkupOwner(review, actor, file.stage);
+  if (review.final_status) throw new AppError('Markup files are locked after final approval', 400);
+  await prisma.reviewMarkupFile.delete({ where: { id: fileId } });
+  try { fs.unlinkSync(getFilePath(file.file_path)); } catch { /* best effort */ }
+}
+
+export async function getReviewMarkupFile(fileId: string, actor: ScopeUser) {
+  const file = await prisma.reviewMarkupFile.findFirst({
+    where: { id: fileId, review: buildReviewScopeWhere(actor) },
+  });
+  if (!file) throw new AppError('Markup file not found', 404);
+  const absolutePath = getFilePath(file.file_path);
+  if (!fs.existsSync(absolutePath)) throw new AppError('Markup file is missing from storage', 404);
+  return { ...file, absolutePath };
 }
 
 // ── addReviewerAndComments ───────────────────────────────────────────────────
@@ -150,6 +379,9 @@ export async function addReviewerAndComments(
   // and only that assigned reviewer may submit (staged workflow, no self-claim).
   if (!review.reviewer_id) {
     throw new AppError('No reviewer has been assigned to this review yet.', 403);
+  }
+  if (!review.delegated_at) {
+    throw new AppError('Review is waiting for PIC Engineer delegation.', 400);
   }
   if (review.reviewer_id !== actorId) {
     throw new AppError('This review is assigned to a different reviewer.', 403);
@@ -459,23 +691,26 @@ export async function saveCommentSheetItems(
   reviewId: string,
   actorId: string,
   actorRole: Role,
-  items: Array<{ seq_no: number; pln_comment: string; contractor_response?: string }>,
+  items: Array<{ seq_no: number; pln_comment: string; contractor_response?: string; version?: number }>,
 ) {
   const review = await prisma.documentReview.findUnique({ where: { id: reviewId } });
   if (!review) throw new AppError('Review not found', 404);
 
-  // Reviewer: can save only when review is in REVIEW or CHECK stage (before checker completes)
-  // Checker: can save only when in CHECK stage
+  // Reviewer: REVIEW/CHECK; Checker: CHECK; Approver: APPROVE. Every edit is
+  // retained in the same field-level audit trail.
   const stage = getCurrentStage(review.reviewed_at, review.checked_at, review.approved_at);
-  const allowedRoles: Role[] = [Role.REVIEWER, Role.CHECKER];
+  const allowedRoles: Role[] = [Role.REVIEWER, Role.CHECKER, Role.APPROVER];
   if (!allowedRoles.includes(actorRole)) {
-    throw new AppError('Only Reviewer or Checker can edit comment sheet items', 403);
+    throw new AppError('Only Reviewer, Checker, or Approver can edit comment sheet items', 403);
   }
   if (actorRole === Role.CHECKER && stage !== 'CHECK') {
     throw new AppError('Checker can only edit items during the CHECK stage', 400);
   }
   if (actorRole === Role.REVIEWER && !['REVIEW', 'CHECK'].includes(stage)) {
     throw new AppError('Comment sheet items can only be edited during REVIEW or CHECK stage', 400);
+  }
+  if (actorRole === Role.APPROVER && stage !== 'APPROVE') {
+    throw new AppError('Approver can only edit items during the APPROVE stage', 400);
   }
 
   // Validate ownership: reviewer must be assigned, checker must be assigned
@@ -485,24 +720,92 @@ export async function saveCommentSheetItems(
   if (actorRole === Role.CHECKER && review.checker_id !== actorId) {
     throw new AppError('You are not the assigned checker for this review', 403);
   }
+  if (actorRole === Role.APPROVER && review.approver_id !== actorId) {
+    throw new AppError('You are not the assigned approver for this review', 403);
+  }
 
-  // Replace all existing items atomically
+  const duplicateSeq = new Set<number>();
+  for (const item of items) {
+    if (duplicateSeq.has(item.seq_no)) throw new AppError(`Duplicate comment row ${item.seq_no}`, 400);
+    duplicateSeq.add(item.seq_no);
+  }
+
+  // Keep rows and write field-level audit records. This preserves deleted-row
+  // history and lets the UI detect stale edits instead of silently overwriting.
   await prisma.$transaction(async (tx) => {
-    await tx.commentSheetItem.deleteMany({ where: { review_id: reviewId } });
-    if (items.length > 0) {
-      await tx.commentSheetItem.createMany({
-        data: items.map((item) => ({
-          review_id: reviewId,
-          seq_no: item.seq_no,
+    const existing = await tx.commentSheetItem.findMany({ where: { review_id: reviewId } });
+    const incoming = new Map(items.map((item) => [item.seq_no, item]));
+
+    for (const row of existing) {
+      if (!row.deleted_at && !incoming.has(row.seq_no)) {
+        await tx.commentSheetItemAudit.create({
+          data: {
+            review_id: reviewId,
+            item_id: row.id,
+            field_name: 'ROW',
+            old_value: JSON.stringify({ seq_no: row.seq_no, pln_comment: row.pln_comment, contractor_response: row.contractor_response }),
+            new_value: null,
+            changed_by: actorId,
+          },
+        });
+        await tx.commentSheetItem.update({
+          where: { id: row.id },
+          data: { deleted_at: new Date(), deleted_by: actorId, version: { increment: 1 } },
+        });
+      }
+    }
+
+    for (const item of items) {
+      const row = existing.find((candidate) => candidate.seq_no === item.seq_no);
+      if (!row) {
+        await tx.commentSheetItem.create({
+          data: {
+            review_id: reviewId,
+            seq_no: item.seq_no,
+            pln_comment: item.pln_comment,
+            contractor_response: item.contractor_response ?? null,
+          },
+        });
+        continue;
+      }
+      if (item.version !== undefined && item.version !== row.version) {
+        throw new AppError(`Comment row ${item.seq_no} changed by another user. Reload before saving.`, 409);
+      }
+
+      const nextResponse = item.contractor_response ?? null;
+      const changes = [
+        ['PLN_COMMENT', row.pln_comment, item.pln_comment],
+        ['CONTRACTOR_RESPONSE', row.contractor_response, nextResponse],
+      ] as const;
+      for (const [fieldName, oldValue, newValue] of changes) {
+        if (oldValue !== newValue) {
+          await tx.commentSheetItemAudit.create({
+            data: {
+              review_id: reviewId,
+              item_id: row.id,
+              field_name: fieldName,
+              old_value: oldValue,
+              new_value: newValue,
+              changed_by: actorId,
+            },
+          });
+        }
+      }
+      await tx.commentSheetItem.update({
+        where: { id: row.id },
+        data: {
           pln_comment: item.pln_comment,
-          contractor_response: item.contractor_response ?? null,
-        })),
+          contractor_response: nextResponse,
+          deleted_at: null,
+          deleted_by: null,
+          ...(changes.some(([, oldValue, newValue]) => oldValue !== newValue) ? { version: { increment: 1 } } : {}),
+        },
       });
     }
   });
 
   return prisma.commentSheetItem.findMany({
-    where: { review_id: reviewId },
+    where: { review_id: reviewId, deleted_at: null },
     orderBy: { seq_no: 'asc' },
   });
 }
@@ -514,7 +817,7 @@ export async function getCommentSheetItems(reviewId: string) {
   if (!review) throw new AppError('Review not found', 404);
 
   return prisma.commentSheetItem.findMany({
-    where: { review_id: reviewId },
+    where: { review_id: reviewId, deleted_at: null },
     orderBy: { seq_no: 'asc' },
   });
 }
@@ -565,6 +868,7 @@ async function regenerateCommentSheetPdf(reviewId: string): Promise<void> {
       seq_no:               i.seq_no,
       pln_comment:          i.pln_comment,
       contractor_response:  i.contractor_response ?? undefined,
+      is_edited:            i.version > 0,
     }));
 
     await generateCommentSheet(reviewData, sheetItems, outputPath);
@@ -735,8 +1039,20 @@ export async function getPendingReviews(
   // ── Section 1: Active reviews that need action ───────────────────────────
   let activeWhereClause: Record<string, unknown> = {};
 
-  if (actorRole === Role.PIC_CONSULTANT || actorRole === Role.PIC_PROJECT) {
+  if (actorRole === Role.PIC_CONSULTANT) {
     // PIC roles see all reviews not yet assigned a reviewer
+    activeWhereClause = {
+      final_status: null,
+      reviewer_id: null,
+      document: { boq_item: { project: { consultant_pics: { some: { consultant_id: actorId } } } } },
+    };
+  } else if (actorRole === Role.PIC_ENGINEER) {
+    activeWhereClause = {
+      final_status: null,
+      reviewer_id: null,
+      document: { boq_item: { project: { owner_unit_id: _actorUnitId } } },
+    };
+  } else if (actorRole === Role.PIC_PROJECT) {
     activeWhereClause = { final_status: null, reviewer_id: null };
   } else if (actorRole === Role.REVIEWER) {
     // Reviewer only sees reviews PIC_CONSULTANT has explicitly assigned to them —
@@ -775,6 +1091,10 @@ export async function getPendingReviews(
     amsWhereClause['checker_id'] = actorId;
   } else if (actorRole === Role.APPROVER) {
     amsWhereClause['approver_id'] = actorId;
+  } else if (actorRole === Role.PIC_CONSULTANT) {
+    amsWhereClause['document'] = {
+      boq_item: { project: { consultant_pics: { some: { consultant_id: actorId } } } },
+    };
   }
   // PIC_CONSULTANT / PIC_PROJECT: no personal filter — see all pending AMS
 
@@ -932,7 +1252,11 @@ export async function getNotifications(
   // PIC_CONSULTANT — documents submitted but no reviewer assigned yet
   if (actorRole === Role.PIC_CONSULTANT) {
     const pending = await prisma.documentReview.findMany({
-      where: { final_status: null, reviewer_id: null },
+      where: {
+        final_status: null,
+        reviewer_id: null,
+        document: { boq_item: { project: { consultant_pics: { some: { consultant_id: actorId } } } } },
+      },
       include: docInclude,
       orderBy: { sla_deadline: 'asc' },
     });
@@ -942,6 +1266,28 @@ export async function getNotifications(
         type: r.sla_deadline && new Date() > r.sla_deadline ? 'OVERDUE' : 'ACTION_REQUIRED',
         title: 'Document pending reviewer assignment',
         body: `"${r.document?.title ?? ''}" has been submitted and needs a reviewer assigned.`,
+        ...buildBase(r),
+      });
+    }
+  }
+
+  if (actorRole === Role.PIC_ENGINEER) {
+    const actor = await prisma.user.findUnique({ where: { id: actorId }, select: { unit_id: true } });
+    const pending = await prisma.documentReview.findMany({
+      where: {
+        final_status: null,
+        reviewer_id: null,
+        document: { boq_item: { project: { owner_unit_id: actor?.unit_id ?? '__none__' } } },
+      },
+      include: docInclude,
+      orderBy: { sla_deadline: 'asc' },
+    });
+    for (const r of pending) {
+      notifications.push({
+        id: `delegate-${r.id}`,
+        type: r.sla_deadline && new Date() > r.sla_deadline ? 'OVERDUE' : 'ACTION_REQUIRED',
+        title: 'Review waiting for delegation',
+        body: `Delegate "${r.document?.title ?? ''}" to an eligible consultant Reviewer.`,
         ...buildBase(r),
       });
     }
@@ -1229,9 +1575,18 @@ export async function saveItpItems(
     );
   }
 
-  const allowedRoles: Role[] = [Role.REVIEWER, Role.CHECKER];
+  const allowedRoles: Role[] = [Role.VENDOR, Role.REVIEWER, Role.CHECKER];
   if (!allowedRoles.includes(actorRole)) {
-    throw new AppError('Only Reviewer or Checker can edit ITP items', 403);
+    throw new AppError('Only Vendor, Reviewer, or Checker can edit ITP items', 403);
+  }
+
+  if (actorRole === Role.VENDOR) {
+    if (document.uploaded_by !== actorId) {
+      throw new AppError('Only the document uploader can edit draft ITP items', 403);
+    }
+    if (document.status !== ReviewStatus.DRAFT) {
+      throw new AppError('Vendor ITP editing is only available while the document is a draft', 403);
+    }
   }
 
   const activeReview = await prisma.documentReview.findFirst({

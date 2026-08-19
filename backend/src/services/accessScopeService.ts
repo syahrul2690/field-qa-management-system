@@ -57,7 +57,12 @@ export function buildBoqItemScopeWhere(user: ScopeUser): Prisma.BoqItemWhereInpu
 }
 
 export function buildDocumentScopeWhere(user: ScopeUser): Prisma.DocumentWhereInput {
-  return { boq_item: buildBoqItemScopeWhere(user) };
+  return {
+    OR: [
+      { boq_item: buildBoqItemScopeWhere(user) },
+      { boq_item_links: { some: { boq_item: buildBoqItemScopeWhere(user) } } },
+    ],
+  };
 }
 
 export function buildReviewScopeWhere(user: ScopeUser): Prisma.DocumentReviewWhereInput {

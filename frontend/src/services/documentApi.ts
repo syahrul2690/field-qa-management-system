@@ -12,4 +12,5 @@ export const documentApi = {
     apiClient.post(`/documents/${documentId}/revisions`, data, {
       headers: { 'Content-Type': 'multipart/form-data' },
     }),
+  submit: (documentId: string) => apiClient.post('/reviews', { document_id: documentId }),
 };

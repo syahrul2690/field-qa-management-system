@@ -2,6 +2,7 @@ import { Request, Response } from 'express';
 import { asyncHandler } from '../utils/asyncHandler';
 import * as integrationService from '../services/integrationService';
 import * as integrationAuthService from '../services/integrationAuthService';
+import { AppError } from '../utils/AppError';
 
 export const getProjects = asyncHandler(async (_req: Request, res: Response) => {
   const projects = await integrationService.getProjects();
@@ -30,6 +31,27 @@ export const getDocument = asyncHandler(async (req: Request, res: Response) => {
   }
 
   res.json({ success: true, data: doc });
+});
+
+export const writeBackInspectionResult = asyncHandler(async (req: Request, res: Response) => {
+  const { boqItemId } = req.params;
+  const { inspection_report_id, revision_no, status, result, report_pdf_url, payload } = req.body ?? {};
+  if (!inspection_report_id || !status) {
+    throw new AppError('inspection_report_id and status are required', 400);
+  }
+  const saved = await integrationService.writeBackInspectionResult(boqItemId, {
+    inspection_report_id,
+    revision_no,
+    status,
+    result,
+    report_pdf_url,
+    payload,
+  });
+  if (!saved) {
+    res.status(404).json({ success: false, message: 'BOQ item not found' });
+    return;
+  }
+  res.json({ success: true, data: saved });
 });
 
 export const verifyAuth = asyncHandler(async (req: Request, res: Response) => {

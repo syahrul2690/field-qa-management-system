@@ -19,8 +19,9 @@ function isValidDocumentSection(value: string): value is DocumentSection {
  *   - files[] (PDFs)
  */
 export const uploadDocument = asyncHandler(async (req: Request, res: Response) => {
-  const { boq_item_id, section, doc_number, title, surat_pengantar_no } = req.body as {
+  const { boq_item_id, section, doc_number, title, surat_pengantar_no, boq_item_ids } = req.body as {
     boq_item_id?: string;
+    boq_item_ids?: string | string[];
     section?: string;
     doc_number?: string;
     title?: string;
@@ -42,10 +43,14 @@ export const uploadDocument = asyncHandler(async (req: Request, res: Response) =
   }
 
   const files = (req.files as Express.Multer.File[]) ?? [];
+  const coverageIds = typeof boq_item_ids === 'string'
+    ? (() => { try { return JSON.parse(boq_item_ids) as string[]; } catch { return [boq_item_ids]; } })()
+    : boq_item_ids;
 
   const document = await documentService.createDocument(
     {
       boq_item_id,
+      boq_item_ids: coverageIds,
       section,
       doc_number,
       title,

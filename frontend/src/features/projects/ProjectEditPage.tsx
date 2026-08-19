@@ -40,6 +40,15 @@ export function ProjectEditPage() {
 
   const project = projectData?.data?.data;
 
+  const { data: candidateData } = useQuery({
+    queryKey: ['project-consultant-pic-candidates', id],
+    queryFn: () => projectApi.consultantPicCandidates(id!),
+    enabled: !!id,
+  });
+  const consultantCandidates = candidateData?.data?.data ?? [];
+  const consultantPics = project?.consultant_pics ?? [];
+  const [consultantId, setConsultantId] = useState('');
+
   const [name, setName] = useState('');
   const [projectType, setProjectType] = useState('');
   const [urgency, setUrgency] = useState('NORMAL');
@@ -68,6 +77,27 @@ export function ProjectEditPage() {
       const axiosError = err as { response?: { data?: { message?: string } } };
       setError(axiosError.response?.data?.message ?? 'Failed to update project.');
     },
+  });
+
+  const assignPicMutation = useMutation({
+    mutationFn: (userId: string) => projectApi.assignConsultantPic(id!, userId),
+    onSuccess: () => {
+      setConsultantId('');
+      queryClient.invalidateQueries({ queryKey: ['project', id] });
+      queryClient.invalidateQueries({ queryKey: ['project-consultant-pic-candidates', id] });
+      addToast('success', 'Consultant PIC assigned to this project.');
+    },
+    onError: () => addToast('error', 'Failed to assign consultant PIC.'),
+  });
+
+  const removePicMutation = useMutation({
+    mutationFn: (userId: string) => projectApi.removeConsultantPic(id!, userId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['project', id] });
+      queryClient.invalidateQueries({ queryKey: ['project-consultant-pic-candidates', id] });
+      addToast('success', 'Consultant PIC removed from this project.');
+    },
+    onError: () => addToast('error', 'Failed to remove consultant PIC.'),
   });
 
   const handleSubmit = (e: FormEvent) => {
@@ -250,6 +280,49 @@ export function ProjectEditPage() {
             </button>
           </div>
         </form>
+      </div>
+
+      <div className="card p-6 mt-5">
+        <div className="mb-4">
+          <h2 className="font-semibold text-gray-900">Project Consultant PICs</h2>
+          <p className="text-xs text-gray-500 mt-1">Only assigned consultant PICs can allocate review teams for this project.</p>
+        </div>
+        <div className="space-y-2 mb-4">
+          {consultantPics.length === 0 ? (
+            <p className="text-sm text-gray-400">No consultant PIC assigned yet.</p>
+          ) : consultantPics.map((assignment: any) => (
+            <div key={assignment.id} className="flex items-center justify-between gap-3 rounded-md border border-gray-200 px-3 py-2">
+              <div>
+                <p className="text-sm font-medium text-gray-800">{assignment.consultant?.name}</p>
+                <p className="text-xs text-gray-400">{assignment.consultant?.email}</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => removePicMutation.mutate(assignment.consultant_id)}
+                className="text-xs text-red-600 hover:text-red-700"
+                disabled={removePicMutation.isPending}
+              >
+                Remove
+              </button>
+            </div>
+          ))}
+        </div>
+        <div className="flex flex-wrap gap-3">
+          <select value={consultantId} onChange={(e) => setConsultantId(e.target.value)} className="input flex-1 min-w-[220px]">
+            <option value="">Select approved PIC Consultant…</option>
+            {consultantCandidates.map((candidate: any) => (
+              <option key={candidate.id} value={candidate.id}>{candidate.name} — {candidate.email}</option>
+            ))}
+          </select>
+          <button
+            type="button"
+            onClick={() => consultantId && assignPicMutation.mutate(consultantId)}
+            disabled={!consultantId || assignPicMutation.isPending}
+            className="btn-primary"
+          >
+            {assignPicMutation.isPending ? 'Assigning…' : 'Assign PIC'}
+          </button>
+        </div>
       </div>
     </div>
   );

@@ -15,6 +15,10 @@ integrationRoutes.get('/boq-items/:boqItemId/qc-readiness', integrationControlle
 // GET /api/integration/documents/:documentId — Document metadata + ITP items
 integrationRoutes.get('/documents/:documentId', integrationController.getDocument);
 
+// POST /api/integration/boq-items/:boqItemId/inspection-result
+// Idempotent QC report write-back; retries update the same report/item ledger row.
+integrationRoutes.post('/boq-items/:boqItemId/inspection-result', integrationController.writeBackInspectionResult);
+
 // POST /api/integration/auth/verify — Verify email+password, return user info + qc_role
 integrationRoutes.post('/auth/verify', integrationController.verifyAuth);
 

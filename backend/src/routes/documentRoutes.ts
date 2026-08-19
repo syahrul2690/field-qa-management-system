@@ -48,10 +48,11 @@ documentRoutes.get('/:documentId', authMiddleware, documentController.getDocumen
 // GET /api/documents/:documentId/itp-items — List ITP inspection items (authenticated)
 documentRoutes.get('/:documentId/itp-items', authMiddleware, getItpItems);
 
-// PUT /api/documents/:documentId/itp-items — Save ITP inspection items (REVIEWER or CHECKER)
+// PUT /api/documents/:documentId/itp-items — Vendor may prepare draft ITP rows;
+// Reviewer/Checker may refine them during the review workflow.
 documentRoutes.put(
   '/:documentId/itp-items',
   authMiddleware,
-  requireRole(Role.REVIEWER, Role.CHECKER),
+  requireRole(Role.VENDOR, Role.REVIEWER, Role.CHECKER),
   saveItpItems,
 );

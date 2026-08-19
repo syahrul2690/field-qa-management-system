@@ -11,8 +11,16 @@ export const projectApi = {
     apiClient.post(`/projects/${id}/vendors`, { vendor_institution_id: vendorInstitutionId }),
   removeVendor: (id: string, vendorId: string) =>
     apiClient.delete(`/projects/${id}/vendors/${vendorId}`),
+  consultantPics: (id: string) => apiClient.get(`/projects/${id}/consultant-pics`),
+  consultantPicCandidates: (id: string) => apiClient.get(`/projects/${id}/consultant-pic-candidates`),
+  assignConsultantPic: (id: string, consultantId: string) =>
+    apiClient.post(`/projects/${id}/consultant-pics`, { consultant_id: consultantId }),
+  removeConsultantPic: (id: string, consultantId: string) =>
+    apiClient.delete(`/projects/${id}/consultant-pics/${consultantId}`),
   dashboard: (params?: Record<string, string>) =>
     apiClient.get('/projects/dashboard', { params }),
+  dashboardExport: (params?: Record<string, string>) =>
+    apiClient.get('/projects/dashboard/export', { params, responseType: 'blob' }),
   approvedDocuments: (id: string) =>
     apiClient.get(`/projects/${id}/approved-documents`),
 };

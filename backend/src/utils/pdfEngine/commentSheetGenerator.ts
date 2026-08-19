@@ -34,6 +34,7 @@ export interface CommentSheetItemData {
   seq_no: number;
   pln_comment: string;
   contractor_response?: string | null;
+  is_edited?: boolean;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -382,10 +383,11 @@ export async function generateCommentSheet(
 
     if (item) {
       drawCellText(doc, { x: LEFT, y: rowY, w: CMT_0, h: rowH, text: `${item.seq_no}.`, align: 'center', fontSize: 7.5 });
-      drawCellText(doc, { x: LEFT + CMT_0, y: rowY, w: CMT_1, h: rowH, text: item.pln_comment, align: 'left', vAlign: 'top', fontSize: 7.5, wrap: true });
+      const editMarker = item.is_edited ? '\n[EDITED]' : '';
+      drawCellText(doc, { x: LEFT + CMT_0, y: rowY, w: CMT_1, h: rowH, text: `${item.pln_comment}${editMarker}`, align: 'left', vAlign: 'top', fontSize: 7.5, wrap: true });
       if (item.contractor_response) {
         drawCellText(doc, { x: LEFT + CMT_0 + CMT_1, y: rowY, w: CMT_2, h: rowH, text: `${item.seq_no}.`, align: 'center', fontSize: 7.5 });
-        drawCellText(doc, { x: LEFT + CMT_0 + CMT_1 + CMT_2, y: rowY, w: CMT_3, h: rowH, text: item.contractor_response, align: 'left', vAlign: 'top', fontSize: 7.5, wrap: true });
+        drawCellText(doc, { x: LEFT + CMT_0 + CMT_1 + CMT_2, y: rowY, w: CMT_3, h: rowH, text: `${item.contractor_response}${item.is_edited ? '\n[EDITED]' : ''}`, align: 'left', vAlign: 'top', fontSize: 7.5, wrap: true });
       }
     }
     curY += rowH;

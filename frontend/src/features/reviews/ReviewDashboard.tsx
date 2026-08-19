@@ -223,7 +223,7 @@ function EmptyState({ message }: { message: string }) {
 export function ReviewDashboard() {
   const { user } = useAuthStore();
   const isReviewer = user?.role === 'REVIEWER';
-  const isPic = user?.role === 'PIC_CONSULTANT' || user?.role === 'PIC_PROJECT';
+  const isPic = user?.role === 'PIC_CONSULTANT' || user?.role === 'PIC_PROJECT' || user?.role === 'PIC_ENGINEER';
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['reviews', 'pending'],
@@ -234,9 +234,11 @@ export function ReviewDashboard() {
   const queue: QueueData = data?.data?.data ?? { active: [], awaiting_ams: [] };
   const { active, awaiting_ams } = queue;
 
-  const pageTitle = isPic ? 'Assignment Queue' : 'Review Queue';
+  const pageTitle = user?.role === 'PIC_ENGINEER' ? 'Delegation Queue' : isPic ? 'Assignment Queue' : 'Review Queue';
   const pageSubtitle = isPic
-    ? 'Documents submitted by vendors that need a review team assigned.'
+    ? user?.role === 'PIC_ENGINEER'
+      ? 'Documents in your owner-unit scope waiting for consultant Reviewer delegation.'
+      : 'Documents submitted by vendors that need a review team assigned.'
     : 'Documents awaiting your review action.';
 
   return (

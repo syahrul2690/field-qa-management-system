@@ -54,12 +54,12 @@ export default function App() {
 
           {/* Reviews — only roles that participate in the review workflow */}
           <Route path="reviews" element={
-            <RoleGuard roles={['REVIEWER', 'CHECKER', 'APPROVER', 'PIC_CONSULTANT']}>
+          <RoleGuard roles={['REVIEWER', 'CHECKER', 'APPROVER', 'PIC_CONSULTANT', 'PIC_ENGINEER']}>
               <ReviewDashboard />
             </RoleGuard>
           } />
           <Route path="reviews/:reviewId" element={
-            <RoleGuard roles={['REVIEWER', 'CHECKER', 'APPROVER', 'PIC_CONSULTANT']}>
+          <RoleGuard roles={['REVIEWER', 'CHECKER', 'APPROVER', 'PIC_CONSULTANT', 'PIC_ENGINEER']}>
               <ReviewDetailPage />
             </RoleGuard>
           } />

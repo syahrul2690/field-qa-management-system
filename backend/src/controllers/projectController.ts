@@ -4,6 +4,18 @@ import { InstitutionType, ProjectType, ProjectUrgency } from '@prisma/client';
 import { asyncHandler } from '../utils/asyncHandler';
 import { AppError } from '../utils/AppError';
 import * as projectService from '../services/projectService';
+import { buildDashboardWorkbook } from '../utils/excelExport/dashboardExport';
+
+function dashboardFilters(req: Request): { ownerUnitId?: string; vendorInstitutionId?: string } {
+  if (!req.user) throw new AppError('Unauthorized', 401);
+  if (req.user.institution_type === InstitutionType.VENDOR) {
+    return { vendorInstitutionId: req.user.institution_id };
+  }
+  if (req.user.institution_type === InstitutionType.OWNER && typeof req.query.owner_unit_id === 'string') {
+    return { ownerUnitId: req.query.owner_unit_id };
+  }
+  return {};
+}
 
 // ============================================================
 // Zod schemas
@@ -47,6 +59,10 @@ const createAmendmentSchema = z
 
 const assignVendorSchema = z.object({
   vendor_institution_id: z.string().min(1, "Vendor institution ID is required"),
+});
+
+const assignConsultantPicSchema = z.object({
+  consultant_id: z.string().min(1, 'Consultant user ID is required'),
 });
 
 // ============================================================
@@ -160,19 +176,39 @@ export const removeVendor = asyncHandler(async (req: Request, res: Response) => 
   res.json({ success: true, message: 'Vendor removed from project' });
 });
 
-export const getDashboard = asyncHandler(async (req: Request, res: Response) => {
-  if (!req.user) throw new AppError('Unauthorized', 401);
-
-  const filters: { ownerUnitId?: string; vendorInstitutionId?: string } = {};
-  if (req.user.institution_type === InstitutionType.VENDOR) {
-    filters.vendorInstitutionId = req.user.institution_id;
-  } else if (req.user.institution_type === InstitutionType.OWNER) {
-    const ownerUnitId = req.query.owner_unit_id as string | undefined;
-    if (ownerUnitId) filters.ownerUnitId = ownerUnitId;
-  }
-
-  const data = await projectService.getDashboardData(filters);
+export const listConsultantPics = asyncHandler(async (req: Request, res: Response) => {
+  const data = await projectService.listConsultantPics(req.params.id);
   res.json({ success: true, data });
+});
+
+export const listConsultantPicCandidates = asyncHandler(async (req: Request, res: Response) => {
+  const data = await projectService.listConsultantPicCandidates(req.params.id);
+  res.json({ success: true, data });
+});
+
+export const assignConsultantPic = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) throw new AppError('Unauthorized', 401);
+  const { consultant_id } = assignConsultantPicSchema.parse(req.body);
+  const data = await projectService.assignConsultantPic(req.params.id, consultant_id, req.user.id);
+  res.status(201).json({ success: true, data });
+});
+
+export const removeConsultantPic = asyncHandler(async (req: Request, res: Response) => {
+  await projectService.removeConsultantPic(req.params.id, req.params.consultantId);
+  res.json({ success: true, message: 'Consultant PIC removed from project' });
+});
+
+export const getDashboard = asyncHandler(async (req: Request, res: Response) => {
+  const data = await projectService.getDashboardData(dashboardFilters(req));
+  res.json({ success: true, data });
+});
+
+export const exportDashboard = asyncHandler(async (req: Request, res: Response) => {
+  const data = await projectService.getDashboardData(dashboardFilters(req));
+  const workbook = await buildDashboardWorkbook(data);
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename="field-qa-dashboard.xlsx"');
+  res.send(workbook);
 });
 
 export const getApprovedDocumentsByProject = asyncHandler(async (req: Request, res: Response) => {

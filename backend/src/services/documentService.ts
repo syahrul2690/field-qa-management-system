@@ -8,6 +8,7 @@ import { submitForReview } from './reviewService';
 
 interface CreateDocumentInput {
   boq_item_id: string;
+  boq_item_ids?: string[];
   section: DocumentSection;
   doc_number: string;
   title: string;
@@ -21,6 +22,17 @@ interface CreateRevisionInput {
   title: string;
   surat_pengantar_no?: string;
   uploaded_by: string;
+}
+
+async function resolveCoverageIds(primaryId: string, requestedIds?: string[]): Promise<string[]> {
+  const ids = Array.from(new Set([primaryId, ...(requestedIds ?? [])].filter(Boolean)));
+  const items = await prisma.boqItem.findMany({ where: { id: { in: ids } }, select: { id: true, project_id: true } });
+  if (items.length !== ids.length) throw new AppError('One or more BoQ coverage items were not found', 404);
+  const projectId = items[0]?.project_id;
+  if (items.some((item) => item.project_id !== projectId)) {
+    throw new AppError('All BoQ coverage items must belong to the same project', 400);
+  }
+  return ids;
 }
 
 // ─── Phase 1 Prerequisite Check ───────────────────────────────────────────────
@@ -65,6 +77,7 @@ export async function createDocument(
   files: Express.Multer.File[],
 ) {
   const { boq_item_id, section, doc_number, title, surat_pengantar_no, uploaded_by } = input;
+  const coverageIds = await resolveCoverageIds(boq_item_id, input.boq_item_ids);
 
   // 1. Verify BoQ item exists and retrieve project_id
   const boqItem = await prisma.boqItem.findUnique({
@@ -120,6 +133,10 @@ export async function createDocument(
       });
     }
 
+    await tx.documentBoqItem.createMany({
+      data: coverageIds.map((boqItemId) => ({ document_id: doc.id, boq_item_id: boqItemId })),
+    });
+
     return tx.document.findUnique({
       where: { id: doc.id },
       include: { files: true },
@@ -148,7 +165,7 @@ export async function createRevision(
   // 1. Find existing document
   const oldDoc = await prisma.document.findUnique({
     where: { id: documentId },
-    include: { boq_item: { select: { project_id: true } } },
+    include: { boq_item: { select: { project_id: true } }, itp_items: true, boq_item_links: true },
   });
 
   if (!oldDoc) {
@@ -220,15 +237,39 @@ export async function createRevision(
       });
     }
 
+    const inheritedCoverage = oldDoc.boq_item_links.length > 0
+      ? oldDoc.boq_item_links.map((link) => link.boq_item_id)
+      : [oldDoc.boq_item_id];
+    await tx.documentBoqItem.createMany({
+      data: inheritedCoverage.map((boqItemId) => ({ document_id: newDoc.id, boq_item_id: boqItemId })),
+    });
+
+    if (oldDoc.itp_items.length > 0) {
+      await tx.itpItem.createMany({
+        data: oldDoc.itp_items.map((item) => ({
+          document_id: newDoc.id,
+          seq_no: item.seq_no,
+          activity: item.activity,
+          acceptance_criteria: item.acceptance_criteria,
+          reference_standard: item.reference_standard,
+          verifying_document: item.verifying_document,
+          sub_code: item.sub_code,
+          pp_code: item.pp_code,
+          pln_code: item.pln_code,
+          phase: item.phase,
+          category: item.category,
+        })),
+      });
+    }
+
     return tx.document.findUnique({
       where: { id: newDoc.id },
       include: { files: true },
     });
   });
 
-  // Immediately submit the new revision for review, same as a first-time upload.
-  await submitForReview(newDocument!.id, uploaded_by);
-
+  // Revisions stay editable DRAFTs so vendors can update copied ITP rows and
+  // submit only when the package is complete. SLA starts on explicit submit.
   return prisma.document.findUnique({
     where: { id: newDocument!.id },
     include: { files: true },
@@ -240,7 +281,10 @@ export async function createRevision(
 export async function listDocuments(boqItemId: string, section?: DocumentSection) {
   const documents = await prisma.document.findMany({
     where: {
-      boq_item_id: boqItemId,
+      OR: [
+        { boq_item_id: boqItemId },
+        { boq_item_links: { some: { boq_item_id: boqItemId } } },
+      ],
       ...(section ? { section } : {}),
     },
     include: { files: true },
@@ -274,7 +318,10 @@ export async function getDocumentHistory(
 ) {
   const history = await prisma.document.findMany({
     where: {
-      boq_item_id: boqItemId,
+      OR: [
+        { boq_item_id: boqItemId },
+        { boq_item_links: { some: { boq_item_id: boqItemId } } },
+      ],
       section,
       doc_number: docNumber,
     },

@@ -2,6 +2,12 @@
 
 _This file tracks patterns and corrections to prevent repeated mistakes._
 
+## Session: 2026-08-19 — Feedback plan execution
+- When a permission expansion is intentional, update the existing regression assertion and its
+  description in the same change; otherwise the test reports a stale contract rather than a code defect.
+- Rule: after changing a user-facing authorization message or role set, run the focused service test
+  immediately and record the new contract in the test name.
+
 ## Session: 2026-04-07 — Initial Planning
 - No lessons yet. File initialized for tracking.
 

@@ -93,12 +93,12 @@ describe('reviewService — ITP items', () => {
       expect(mockPrisma.itpItem.deleteMany).not.toHaveBeenCalled();
     });
 
-    it('throws 403 for a role other than REVIEWER or CHECKER', async () => {
+    it('throws 403 for a role other than VENDOR, REVIEWER, or CHECKER', async () => {
       mockPrisma.document.findUnique.mockResolvedValue({ id: 'doc-1', reviews: [] });
 
       await expect(
         saveItpItems('doc-1', 'user-1', Role.APPROVER, [SAMPLE_ITEM]),
-      ).rejects.toThrow('Only Reviewer or Checker can edit ITP items');
+      ).rejects.toThrow('Only Vendor, Reviewer, or Checker can edit ITP items');
     });
 
     it('throws 403 when the REVIEWER is not the assigned reviewer', async () => {
