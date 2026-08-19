@@ -234,10 +234,16 @@ export function ReviewDashboard() {
   const queue: QueueData = data?.data?.data ?? { active: [], awaiting_ams: [] };
   const { active, awaiting_ams } = queue;
 
-  const pageTitle = user?.role === 'PIC_ENGINEER' ? 'Delegation Queue' : isPic ? 'Assignment Queue' : 'Review Queue';
+  const pageTitle = user?.role === 'PIC_ENGINEER'
+    ? 'Delegation Queue'
+    : user?.role === 'PIC_CONSULTANT'
+    ? 'Delegation & Assignment Queue'
+    : isPic ? 'Assignment Queue' : 'Review Queue';
   const pageSubtitle = isPic
     ? user?.role === 'PIC_ENGINEER'
       ? 'Documents in your owner-unit scope waiting for consultant Reviewer delegation.'
+      : user?.role === 'PIC_CONSULTANT'
+      ? 'Delegate submitted documents to a Reviewer and assign the Checker and Approver for your projects.'
       : 'Documents submitted by vendors that need a review team assigned.'
     : 'Documents awaiting your review action.';
 

@@ -9,6 +9,7 @@ import fs from 'fs';
 import { buildReviewScopeWhere, type ScopeUser } from './accessScopeService';
 import { getFilePath } from './fileStorageService';
 import { assertProjectConsultantPic } from './projectService';
+import { getDelegationScope } from './reviewAuthorization';
 
 // ── submitForReview ──────────────────────────────────────────────────────────
 
@@ -68,8 +69,9 @@ export async function submitForReview(documentId: string, actorId: string) {
 }
 
 // ── delegateReview ───────────────────────────────────────────────────────────
-// Owner-side PIC_ENGINEER assigns the consultant reviewer before the review
-// stage can start. This is a gate, not an approval step.
+// PIC_CONSULTANT is the current business role for project-scoped delegation.
+// PIC_ENGINEER remains supported as the legacy owner-side role. Delegation is
+// a gate, not an approval step.
 
 export async function delegateReview(
   reviewId: string,
@@ -85,11 +87,17 @@ export async function delegateReview(
     prisma.user.findUnique({ where: { id: data.engineer_id }, include: { unit: true, institution: true } }),
   ]);
   if (!review) throw new AppError('Review not found', 404);
-  if (!actor || actor.role !== Role.PIC_ENGINEER || actor.institution.type !== 'OWNER') {
-    throw new AppError('Only an OWNER PIC Engineer can delegate reviews', 403);
+  const delegationScope = actor
+    ? getDelegationScope(actor.role, actor.institution.type)
+    : null;
+  if (!actor || !delegationScope) {
+    throw new AppError('Only an assigned PIC Consultant can delegate reviews', 403);
   }
-  if (review.document.boq_item.project.owner_unit_id !== actor.unit_id) {
+  if (delegationScope === 'OWNER_UNIT' && review.document.boq_item.project.owner_unit_id !== actor.unit_id) {
     throw new AppError('You can only delegate reviews in your owner-unit scope', 403);
+  }
+  if (delegationScope === 'CONSULTANT_PROJECT') {
+    await assertProjectConsultantPic(review.document.boq_item.project_id, actorId);
   }
   if (review.reviewed_at) throw new AppError('Review cannot be re-delegated after review begins', 400);
   if (!engineer || engineer.status !== 'APPROVED' || engineer.role !== Role.REVIEWER || engineer.institution.type !== 'CONSULTANT') {
@@ -133,8 +141,17 @@ export async function listDelegationCandidates(reviewId: string, actorId: string
   });
   const actor = await prisma.user.findUnique({ where: { id: actorId }, include: { institution: true } });
   if (!review) throw new AppError('Review not found', 404);
-  if (!actor || actor.role !== Role.PIC_ENGINEER || actor.institution.type !== 'OWNER' || review.document.boq_item.project.owner_unit_id !== actor.unit_id) {
+  const delegationScope = actor
+    ? getDelegationScope(actor.role, actor.institution.type)
+    : null;
+  if (!actor || !delegationScope) {
     throw new AppError('Insufficient delegation scope', 403);
+  }
+  if (delegationScope === 'OWNER_UNIT' && review.document.boq_item.project.owner_unit_id !== actor.unit_id) {
+    throw new AppError('Insufficient delegation scope', 403);
+  }
+  if (delegationScope === 'CONSULTANT_PROJECT') {
+    await assertProjectConsultantPic(review.document.boq_item.project_id, actorId);
   }
   const unitLevel = review.document.section === DocumentSection.WORK_METHOD ? 2 : 1;
   return prisma.user.findMany({

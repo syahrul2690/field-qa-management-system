@@ -62,14 +62,14 @@ reviewRoutes.post(
 reviewRoutes.get(
   '/:reviewId/delegate-candidates',
   authMiddleware,
-  requireRole(Role.PIC_ENGINEER),
+  requireRole(Role.PIC_ENGINEER, Role.PIC_CONSULTANT),
   listDelegationCandidates,
 );
 
 reviewRoutes.post(
   '/:reviewId/delegate',
   authMiddleware,
-  requireRole(Role.PIC_ENGINEER),
+  requireRole(Role.PIC_ENGINEER, Role.PIC_CONSULTANT),
   delegateReviewToEngineer,
 );
 

@@ -390,3 +390,16 @@ Default model switched to `deepseek/deepseek-v4-flash-0731` (user request,
 2026-08-12). Verified against the live OpenRouter model list (tools: yes),
 smoke-tested on production: tool call + streamed answer with zero reasoning
 leakage into the chat bubble.
+# 2026-08-19 — PIC Consultant delegation mapping fix
+
+- [x] Allow `PIC_CONSULTANT` to perform the project-scoped delegation step.
+- [x] Preserve legacy `PIC_ENGINEER` owner-unit delegation behavior.
+- [x] Verify focused tests, builds, and Field QA browser E2E delegation flow.
+
+## Review — 2026-08-19
+
+- Added `PIC_CONSULTANT` as a project-assigned delegation actor while retaining the legacy `PIC_ENGINEER` owner-unit path.
+- Added role/institution mapping tests.
+- Browser verification passed through PIC delegation, Checker/Approver assignment, Reviewer submission, and Checker confirmation.
+- Hardened the Approver action with an explicit button type, guarded submit handler, trimmed notes, and pending-state accessibility.
+- Reproduced the patched flow in Chrome: the success toast appeared, `Approved By` QR was stamped, and the review reached `COMPLETE` with `APPROVED_A` in the disposable QA database.
