@@ -896,7 +896,7 @@ export function ReviewDetailPage() {
   const [picApproverId, setPicApproverId] = useState('');
 
   const isPicConsultant = user?.role === 'PIC_CONSULTANT';
-  const isPicEngineer = user?.role === 'PIC_ENGINEER';
+  const canDelegateReview = user?.role === 'PIC_ENGINEER' || user?.role === 'PIC_CONSULTANT';
   const isReviewerRole = user?.role === 'REVIEWER';
 
   const { data: checkersData } = useQuery({
@@ -914,7 +914,7 @@ export function ReviewDetailPage() {
   const { data: delegationCandidatesData } = useQuery({
     queryKey: ['review-delegation-candidates', reviewId],
     queryFn: () => reviewApi.delegateCandidates(reviewId!),
-    enabled: isPicEngineer && !!reviewId,
+    enabled: canDelegateReview && !!reviewId,
   });
 
   const availableCheckers  = checkersData?.data?.data ?? [];
@@ -958,6 +958,15 @@ export function ReviewDetailPage() {
     },
     onError: () => addToast('error', 'Failed to approve review.'),
   });
+
+  const submitFinalDecision = () => {
+    if (approveMutation.isPending) return;
+
+    approveMutation.mutate({
+      final_status: finalStatus,
+      comments: approverNotes.trim() ? [{ comment: approverNotes.trim() }] : [],
+    });
+  };
 
   const amsUploadMutation = useMutation({
     mutationFn: (file: File) =>
@@ -1352,17 +1361,49 @@ export function ReviewDetailPage() {
       </div>
 
       {/* PIC_CONSULTANT — assign review team */}
-      {isPicConsultant && review?.current_stage === 'REVIEW' && (
+      {isPicConsultant && review?.current_stage === 'REVIEW' && review?.reviewer_id && (
         <div className="card p-6">
           <div className="flex items-center gap-2 mb-4">
             <svg className="h-5 w-5 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
             </svg>
             <h2 className="font-semibold text-gray-900">
-              {review?.reviewer ? 'Review Team Assignment' : 'Assign Review Team'}
+              {review.checker_id && review.approver_id ? 'Review Team Assignment' : 'Assign Review Team'}
             </h2>
           </div>
-          {review?.reviewer ? (
+          {review?.reviewer && (!review.checker_id || !review.approver_id) ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="label">Checker <span className="text-gray-400 text-xs font-normal">(optional)</span></label>
+                  <select value={picCheckerId} onChange={e => setPicCheckerId(e.target.value)} className="input">
+                    <option value="">Select Checker...</option>
+                    {availableCheckers.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="label">Approver <span className="text-gray-400 text-xs font-normal">(optional)</span></label>
+                  <select value={picApproverId} onChange={e => setPicApproverId(e.target.value)} className="input">
+                    <option value="">Select Approver...</option>
+                    {availableApprovers.map((a: any) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="flex justify-end pt-2 border-t border-gray-100">
+                <button
+                  onClick={() => assignTeamMutation.mutate({
+                    ...(picCheckerId  ? { checker_id:  picCheckerId  } : {}),
+                    ...(picApproverId ? { approver_id: picApproverId } : {}),
+                  })}
+                  disabled={(!picCheckerId && !picApproverId) || assignTeamMutation.isPending}
+                  className="btn-primary flex items-center gap-2"
+                >
+                  {assignTeamMutation.isPending ? <LoadingSpinner size="sm" /> : null}
+                  Assign Review Team
+                </button>
+              </div>
+            </div>
+          ) : review?.reviewer ? (
             <div className="space-y-3">
               <div className="grid grid-cols-3 gap-3 text-sm">
                 {(['reviewer', 'checker', 'approver'] as const).map((role) => {
@@ -1410,18 +1451,14 @@ export function ReviewDetailPage() {
                 </button>
               </div>
             </div>
-          ) : (
-            <div className="rounded-md border border-amber-200 bg-amber-50 p-4 text-sm text-amber-800">
-              Waiting for the Owner PIC Engineer to delegate this review to an eligible consultant Reviewer.
-            </div>
-          )}
+          ) : null}
         </div>
       )}
 
-      {isPicEngineer && review?.current_stage === 'REVIEW' && !review?.delegated_at && (
+      {canDelegateReview && review?.current_stage === 'REVIEW' && !review?.delegated_at && (
         <div className="card p-6 border-l-4 border-blue-400">
           <h2 className="font-semibold text-gray-900">Delegate Review</h2>
-          <p className="text-xs text-gray-500 mt-1 mb-4">Choose the eligible consultant Reviewer for this owner-unit project. Delegation does not change the original SLA deadline.</p>
+          <p className="text-xs text-gray-500 mt-1 mb-4">Choose the eligible consultant Reviewer for this project. Delegation does not change the original SLA deadline.</p>
           <div className="flex flex-wrap gap-3">
             <select value={picReviewerId} onChange={(e) => setPicReviewerId(e.target.value)} className="input flex-1 min-w-[240px]">
               <option value="">Select eligible Reviewer…</option>
@@ -1578,11 +1615,10 @@ export function ReviewDetailPage() {
             </div>
             <div className="flex justify-end">
               <button
-                onClick={() => approveMutation.mutate({
-                  final_status: finalStatus,
-                  comments: approverNotes ? [{ comment: approverNotes }] : [],
-                })}
+                type="button"
+                onClick={submitFinalDecision}
                 disabled={approveMutation.isPending}
+                aria-busy={approveMutation.isPending}
                 className="btn-primary flex items-center gap-2"
               >
                 {approveMutation.isPending ? <LoadingSpinner size="sm" /> : null}

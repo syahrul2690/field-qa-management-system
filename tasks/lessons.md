@@ -2,6 +2,16 @@
 
 _This file tracks patterns and corrections to prevent repeated mistakes._
 
+## Session: 2026-08-19 — E2E scope clarification
+- Browser E2E scope must follow the named product boundary exactly; Field QA and the separate PowerQC application are distinct systems.
+- Rule: confirm the target application before mutating test data, and stop unrelated-app flows immediately when the user narrows scope.
+
+## Session: 2026-08-19 — PIC role mapping clarification
+
+- When a browser E2E action appears inert, reload a fresh role session and verify both the UI result and persisted database state before concluding the product path is broken.
+- Business terminology maps the PIC Engineer workflow to the PIC Consultant account in this test scenario.
+- Rule: distinguish business-role labels from implementation enum names and verify the mapping before declaring a role unavailable.
+
 ## Session: 2026-08-19 — Feedback plan execution
 - When a permission expansion is intentional, update the existing regression assertion and its
   description in the same change; otherwise the test reports a stale contract rather than a code defect.
