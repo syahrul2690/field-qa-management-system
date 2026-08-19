@@ -21,6 +21,39 @@
 
 # Field QA Management System — Implementation Tracker
 
+## End-user feedback plan — UX-safe design revision (2026-08-18)
+- [x] Review v1.0 against current field-qa/field-qc code and Knowledge Base
+- [x] Lock draft-first revision UX so copied ITP items remain editable before submit
+- [x] Lock authenticated/scoped markup downloads
+- [x] Lock field-specific comment-sheet audit history with legacy-safe backfill
+- [x] Lock project-scoped PIC assignment/removal and user-targeted delegation notifications
+- [x] Lock idempotent multi-BoQ inspection-result ledger and compatibility contract
+- [x] Create baseline snapshots/patches for both dirty repositories
+- [x] Execute W1–W5 implementation; keep DB migration rehearsal as a release gate
+
+## Execution Review — 2026-08-19
+- [x] W1: authenticated review markup uploads/downloads, project-scoped consultant PICs, and dashboard Excel export
+- [x] W2: soft-delete comment-sheet history, field-level audit records, optimistic versions, approver editing, and PDF edit markers
+- [x] W3: PIC_ENGINEER delegation gate, owner-unit scope, targeted computed notifications, and PIC_CONSULTANT reviewer-assignment removal
+- [x] W4: vendor-owned draft ITP editing and copy-forward during revision creation
+- [x] W5: QA inspection-result ledger, additive integration alias, QC report identity/PDF write-back, and durable QC retry payload
+- [x] Public static serving explicitly blocks the review-markup storage prefix; markup files are API-streamed only after scope checks
+- [x] QA and QC production builds pass after Prisma client generation
+- [x] Apply migrations and run DB-backed integration tests against the local QA/QC test databases
+
+### Verification limits
+- QA backend tests: 113 passed, including the database integration suite, after applying the six pending QA migrations.
+- QC API tests: 1 passed after applying the pending QC migrations.
+- QA frontend production build: passed; existing Vite chunk-size and mixed import warnings remain.
+- QC monorepo build: passed for shared, API, and web after regenerating the Prisma client; existing Next.js lockfile-root warning remains.
+- QC pre-existing dirty changes remain intentionally separate from the new retry-queue migration/model change.
+
+## Review Notes — 2026-08-18
+- The previous plan was structurally strong but not execution-ready: revision lifecycle, audit ownership,
+  file authorization, PIC scope, notification targeting, and QA↔QC write-back semantics were underspecified.
+- UX decisions above minimize repeated data entry, prevent silent access leaks, preserve audit history,
+  and make cross-system failures visible and retryable.
+
 ## Phase 0: Monorepo Scaffolding + Database Schema
 - [ ] Initialize root `package.json` with npm workspaces (`backend`, `frontend`, `shared`)
 - [ ] Create `tsconfig.base.json` with shared compiler options
