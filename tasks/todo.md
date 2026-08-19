@@ -409,3 +409,9 @@ leakage into the chat bubble.
 - [x] Add a post-CI GitHub workflow that checks mergeability and unresolved review threads for `codex/*` branches.
 - [x] Automatically mark passing draft `codex/*` PRs ready and squash-merge them.
 - [x] Create a Codex monitor to report PR status in this thread and handle the current PR while the repository workflow is introduced.
+
+## Revision — push-triggered behavior
+
+- [x] Run CI on every push to `codex/**`.
+- [x] Run the auto-merge gate after successful `pull_request` or `push` CI runs for `codex/**`.
+- [x] Remove the fixed 10-minute monitor because it is not event-driven.
