@@ -21,6 +21,14 @@
 
 # Field QA Management System — Implementation Tracker
 
+## Auto-merge deployment handoff fix (2026-08-26)
+- [x] Add `actions: write` permission to the auto-merge workflow.
+- [x] Explicitly dispatch `Deploy to VPS` after a successful automatic merge.
+- [x] Force deterministic image rebuilds for workflow-dispatch deployments.
+
+### Review
+- GitHub suppresses downstream `push` workflow events created with `GITHUB_TOKEN`; therefore an automatic PR merge can complete without starting the push-triggered VPS deployment. The auto-merge workflow now dispatches deployment explicitly after merging.
+
 ## Review Queue fix — PIC Consultant vendor submissions (2026-08-26)
 - [x] Restore legacy visibility fallback for projects without explicit Consultant PIC assignments.
 - [x] Keep delegated reviews visible until Reviewer, Checker, and Approver setup is complete.
