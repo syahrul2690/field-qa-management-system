@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
 import { reviewApi } from '../../services/reviewApi';
+import { getPublicFileUrl } from '../../services/fileUrl';
 import { useAuthStore } from '../../store/authStore';
 import { useUIStore } from '../../store/uiStore';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
@@ -1052,7 +1053,14 @@ export function ReviewDetailPage() {
   if (error || !review) {
     return (
       <div className="card p-8 text-center">
-        <p className="text-gray-500">Review not found.</p>
+        <p className="text-gray-500">
+          {error ? 'Unable to load this review. The server may be unavailable or the request timed out.' : 'Review not found.'}
+        </p>
+        {error && (
+          <button onClick={() => queryClient.invalidateQueries({ queryKey: ['review', reviewId] })} className="btn-primary mt-4">
+            Retry
+          </button>
+        )}
         <button onClick={() => navigate('/reviews')} className="btn-secondary mt-4">Back to Queue</button>
       </div>
     );
@@ -1128,11 +1136,10 @@ export function ReviewDetailPage() {
             <div className="flex flex-wrap gap-2">
               {review.files.map(file => {
                 const env = (import.meta as any).env;
-                const baseUrl = env?.VITE_API_URL?.replace('/api', '') ?? 'http://localhost:3000';
                 return (
                   <a
                     key={file.id}
-                    href={`${baseUrl}/uploads/${file.file_path.replace(/\\/g, '/')}`}
+                    href={getPublicFileUrl(file.file_path, env?.VITE_API_URL, window.location.origin)}
                     target="_blank"
                     rel="noreferrer"
                     className="btn-secondary py-1 px-3 text-xs flex items-center gap-1.5"
@@ -1235,7 +1242,7 @@ export function ReviewDetailPage() {
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0 ml-4">
                     <a
-                      href={`${(import.meta as any).env?.VITE_API_URL?.replace('/api', '') ?? 'http://localhost:3000'}/uploads/${review.ams_letter.file_path.replace(/\\/g, '/')}`}
+                      href={getPublicFileUrl(review.ams_letter.file_path, (import.meta as any).env?.VITE_API_URL, window.location.origin)}
                       target="_blank"
                       rel="noreferrer"
                       className="btn-secondary py-1.5 px-3 text-sm flex items-center gap-1.5"

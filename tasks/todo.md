@@ -21,6 +21,15 @@
 
 # Field QA Management System — Implementation Tracker
 
+## Review Queue document loading fix (2026-08-26)
+- [x] Resolve uploaded-document URLs against the deployed site origin instead of localhost.
+- [x] Add a bounded API timeout and visible retry action for review detail loading.
+- [x] Add regression coverage for production and configured API upload URLs.
+
+### Review
+- The review detail page loaded successfully for the tested queue records, but its production document links fell back to `http://localhost:3000` when `VITE_API_URL` was unset. Production Nginx serves `/uploads` from the current site origin, so the browser could not open those links correctly. The frontend now normalizes the file path and uses the current origin by default.
+- Axios requests now time out after 30 seconds, and failed review-detail requests show a Retry action instead of an unbounded loading state.
+
 ## Auto-merge deployment handoff fix (2026-08-26)
 - [x] Add `actions: write` permission to the auto-merge workflow.
 - [x] Explicitly dispatch `Deploy to VPS` after a successful automatic merge.

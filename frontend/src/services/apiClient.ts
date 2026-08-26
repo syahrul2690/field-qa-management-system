@@ -3,6 +3,9 @@ import { getAccessToken, refreshAccessToken } from './tokenRefresh';
 
 const apiClient = axios.create({
   baseURL: '/api',
+  // Prevent a failed/reachable-but-unresponsive API from leaving every page
+  // spinner running forever. Individual long-running requests can override it.
+  timeout: 30_000,
   headers: { 'Content-Type': 'application/json' },
   withCredentials: true, // for refresh token cookie
 });
