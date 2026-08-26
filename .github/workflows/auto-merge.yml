@@ -6,6 +6,7 @@ on:
     types: [completed]
 
 permissions:
+  actions: write
   contents: write
   pull-requests: write
 
@@ -68,3 +69,11 @@ jobs:
             --delete-branch \
             --subject "Auto-merge passing pull request #$pr_number" \
             --body "Merged automatically after CI passed with no unresolved review threads."
+
+          # A merge performed with GITHUB_TOKEN does not emit a downstream
+          # push workflow event. Dispatch deployment explicitly so every
+          # successful auto-merge reaches the VPS without manual intervention.
+          gh workflow run deploy.yml \
+            --repo "$GITHUB_REPOSITORY" \
+            --ref main \
+            --field force_build=true

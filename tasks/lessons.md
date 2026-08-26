@@ -2,6 +2,10 @@
 
 _This file tracks patterns and corrections to prevent repeated mistakes._
 
+## Session: 2026-08-26 — Auto-merge deployment trigger
+- A GitHub Actions merge performed with `GITHUB_TOKEN` does not reliably trigger a downstream `push` workflow.
+- Rule: when an automation workflow mutates the repository and a later workflow is required, explicitly dispatch the later workflow with `actions: write` permission and monitor that run separately.
+
 ## Session: 2026-08-26 — PIC Consultant review queue scope
 - A staged workflow can hide an item between two valid actions when the queue filter models only the first state. After PIC Engineer delegation, the PIC Consultant still needs the same review to assign Checker and Approver.
 - Project-scoped access must preserve the explicitly agreed legacy fallback: projects with no Consultant PIC rows remain visible under the pre-assignment behavior.
