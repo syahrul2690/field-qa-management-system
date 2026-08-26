@@ -28,12 +28,11 @@ import { uploadAmsPdf, uploadReviewMarkup } from '../middlewares/uploadMiddlewar
 export const reviewRoutes = Router();
 
 // GET /reviews/notifications — role-aware notifications (must be before /:reviewId)
-reviewRoutes.get(
-  '/notifications',
-  authMiddleware,
-  requireRole(Role.REVIEWER, Role.CHECKER, Role.APPROVER, Role.PIC_CONSULTANT, Role.PIC_ENGINEER, Role.VENDOR),
-  getNotifications,
-);
+// No requireRole: the notification bell renders for every authenticated user, and
+// getNotifications scopes every query to the caller (actorId) — a role with no
+// branch simply gets an empty list. Gating by role here only produced a 403 on
+// every page load for ADMIN, VIEWER, and PIC_PROJECT.
+reviewRoutes.get('/notifications', authMiddleware, getNotifications);
 
 // GET /reviews/pending — must be registered before /:reviewId to avoid shadowing
 reviewRoutes.get(
