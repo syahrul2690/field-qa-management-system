@@ -2,6 +2,10 @@
 
 _This file tracks patterns and corrections to prevent repeated mistakes._
 
+## Session: 2026-08-26 — Review Queue file URLs
+- Production SPAs served behind a reverse proxy should build same-origin asset links when no public API URL is configured.
+- Rule: never fall back to a developer machine address such as `localhost` for user-facing uploaded files; normalize the path and resolve it against the current origin or an explicitly configured public API origin.
+
 ## Session: 2026-08-26 — Auto-merge deployment trigger
 - A GitHub Actions merge performed with `GITHUB_TOKEN` does not reliably trigger a downstream `push` workflow.
 - Rule: when an automation workflow mutates the repository and a later workflow is required, explicitly dispatch the later workflow with `actions: write` permission and monitor that run separately.
