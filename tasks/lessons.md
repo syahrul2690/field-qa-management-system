@@ -2,6 +2,11 @@
 
 _This file tracks patterns and corrections to prevent repeated mistakes._
 
+## Session: 2026-08-26 — PIC Consultant review queue scope
+- A staged workflow can hide an item between two valid actions when the queue filter models only the first state. After PIC Engineer delegation, the PIC Consultant still needs the same review to assign Checker and Approver.
+- Project-scoped access must preserve the explicitly agreed legacy fallback: projects with no Consultant PIC rows remain visible under the pre-assignment behavior.
+- Rule: test queue filters across the complete handoff (`submitted → reviewer assigned → team assigned`) and distinguish “no assignment rows” from “assigned to another user.”
+
 ## Session: 2026-08-19 — E2E scope clarification
 - Browser E2E scope must follow the named product boundary exactly; Field QA and the separate PowerQC application are distinct systems.
 - Rule: confirm the target application before mutating test data, and stop unrelated-app flows immediately when the user narrows scope.
