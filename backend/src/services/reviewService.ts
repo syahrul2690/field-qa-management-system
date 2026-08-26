@@ -1048,6 +1048,31 @@ export async function getReviewById(reviewId: string) {
 
 // ── getPendingReviews ────────────────────────────────────────────────────────
 
+/**
+ * Consultant PIC visibility is project-scoped when a project has explicit
+ * Consultant PIC assignments. Projects created before that feature have no
+ * assignment rows, so they retain the legacy fallback: every Consultant PIC
+ * can see their submitted reviews.
+ */
+function consultantPicProjectScope(actorId: string) {
+  return {
+    OR: [
+      { consultant_pics: { some: { consultant_id: actorId } } },
+      { consultant_pics: { none: {} } },
+    ],
+  };
+}
+
+function consultantPicReviewScope(actorId: string) {
+  return {
+    document: {
+      boq_item: {
+        project: consultantPicProjectScope(actorId),
+      },
+    },
+  };
+}
+
 export async function getPendingReviews(
   actorId: string,
   actorRole: Role,
@@ -1057,11 +1082,19 @@ export async function getPendingReviews(
   let activeWhereClause: Record<string, unknown> = {};
 
   if (actorRole === Role.PIC_CONSULTANT) {
-    // PIC roles see all reviews not yet assigned a reviewer
+    // PIC Consultant sees submitted reviews in their assigned projects, plus
+    // legacy projects without an explicit Consultant PIC assignment. Keep a
+    // review visible until all three review-team roles are configured; after
+    // delegation, the item must remain visible for Checker/Approver setup.
     activeWhereClause = {
       final_status: null,
-      reviewer_id: null,
-      document: { boq_item: { project: { consultant_pics: { some: { consultant_id: actorId } } } } },
+      reviewed_at: null,
+      OR: [
+        { reviewer_id: null },
+        { checker_id: null },
+        { approver_id: null },
+      ],
+      ...consultantPicReviewScope(actorId),
     };
   } else if (actorRole === Role.PIC_ENGINEER) {
     activeWhereClause = {
@@ -1109,11 +1142,9 @@ export async function getPendingReviews(
   } else if (actorRole === Role.APPROVER) {
     amsWhereClause['approver_id'] = actorId;
   } else if (actorRole === Role.PIC_CONSULTANT) {
-    amsWhereClause['document'] = {
-      boq_item: { project: { consultant_pics: { some: { consultant_id: actorId } } } },
-    };
+    Object.assign(amsWhereClause, consultantPicReviewScope(actorId));
   }
-  // PIC_CONSULTANT / PIC_PROJECT: no personal filter — see all pending AMS
+  // PIC_PROJECT: no personal filter — see all pending AMS.
 
   const reviewInclude = {
     document: {
@@ -1266,13 +1297,18 @@ export async function getNotifications(
 
   // ── 1. ACTION REQUIRED: reviews where user must act ───────────────────────
 
-  // PIC_CONSULTANT — documents submitted but no reviewer assigned yet
+  // PIC_CONSULTANT — documents submitted that still need reviewer/team setup
   if (actorRole === Role.PIC_CONSULTANT) {
     const pending = await prisma.documentReview.findMany({
       where: {
         final_status: null,
-        reviewer_id: null,
-        document: { boq_item: { project: { consultant_pics: { some: { consultant_id: actorId } } } } },
+        reviewed_at: null,
+        OR: [
+          { reviewer_id: null },
+          { checker_id: null },
+          { approver_id: null },
+        ],
+        ...consultantPicReviewScope(actorId),
       },
       include: docInclude,
       orderBy: { sla_deadline: 'asc' },
@@ -1281,8 +1317,8 @@ export async function getNotifications(
       notifications.push({
         id: `action-${r.id}`,
         type: r.sla_deadline && new Date() > r.sla_deadline ? 'OVERDUE' : 'ACTION_REQUIRED',
-        title: 'Document pending reviewer assignment',
-        body: `"${r.document?.title ?? ''}" has been submitted and needs a reviewer assigned.`,
+        title: 'Document pending review-team setup',
+        body: `"${r.document?.title ?? ''}" has been submitted and needs its reviewer team configured.`,
         ...buildBase(r),
       });
     }

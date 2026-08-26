@@ -21,6 +21,15 @@
 
 # Field QA Management System — Implementation Tracker
 
+## Review Queue fix — PIC Consultant vendor submissions (2026-08-26)
+- [x] Restore legacy visibility fallback for projects without explicit Consultant PIC assignments.
+- [x] Keep delegated reviews visible until Reviewer, Checker, and Approver setup is complete.
+- [x] Add regression coverage for active queue and pending AMS scope filters.
+
+### Review
+- Root cause: the PIC Consultant queue required `reviewer_id = null`, so a review disappeared immediately after delegation even though the PIC Consultant still had to assign Checker and Approver. The project filter also omitted the documented no-assignment fallback.
+- Fix: scope PIC Consultant queue and notifications to assigned projects or legacy projects with no PIC rows, and include any unreviewed review missing one of the three team assignments.
+
 ## End-user feedback plan — UX-safe design revision (2026-08-18)
 - [x] Review v1.0 against current field-qa/field-qc code and Knowledge Base
 - [x] Lock draft-first revision UX so copied ITP items remain editable before submit
