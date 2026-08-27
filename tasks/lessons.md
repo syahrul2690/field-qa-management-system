@@ -279,3 +279,14 @@ _This file tracks patterns and corrections to prevent repeated mistakes._
   cannot tell a slow build from a hung one. Run builds in a PTY without the pipe,
   or stream to a log, so progress is visible and an abort is possible before the
   host becomes unresponsive.
+
+### Lesson 30: A unit-tested write-back can still be dead in the real flow — walk the full chain
+- The QA write-back was covered by unit tests (idempotent upsert, retry queue)
+  and the code path looked wired, but the real RFI → inspection → approval flow
+  never produced a write-back: `InspectionsService.submit()` created a detached
+  `Inspection`, so the report's `inspection.rfiRequest` was null and
+  `onFinalApproval` skipped the write-back silently (no error, no queue row).
+- Rule: when an integration crosses two applications, execute at least one full
+  business cycle with real records (even disposable ones) before declaring it
+  done — component probes (readiness, route presence, malformed-payload 400) are
+  not enough.

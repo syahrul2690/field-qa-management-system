@@ -142,6 +142,36 @@ Sandbox RFI/write-back walkthrough:
   GitHub Actions (Field QA pattern) so no build ever runs on the 2 GB VPS; update
   PowerQC DEPLOYMENT.md accordingly.
 
+### Full walkthrough (2026-08-27) — completed with a production bug fix
+
+Executed the complete RFI → inspection → approval → write-back → BOQ badge cycle
+using an isolated `smoke-*` test project in both applications, then removed all
+test records afterward.
+
+**Bug found and fixed:** `InspectionsService.submit()` always created a brand-new
+`Inspection` row, so the generated report lost its link to the approved RFI
+(`RfiRequest.qaBoqItemId`), and the final-approval write-back silently skipped.
+Fix (`c1d90f9` on PowerQC master): submit now reuses the scheduled inspection
+created by the approved RFI (falling back to a new inspection for ad-hoc checks),
+so the report keeps its QA linkage. Added `inspections.service.spec.ts` (3 tests);
+PowerQC API suite now 14/14, Nest build clean.
+
+**Verified end-to-end after the fix (live):**
+1. Vendor MAKER (`vendor@barata.com`) created the RFI — readiness gate passed.
+2. Consultant APPROVER (`approver@consultant.com`) approved/scheduled it.
+3. QA-sourced checklist returned the two FIELD_ITP items (`source: qa`).
+4. Consultant CHECKER (`checker@consultant.com`) submitted a PASS inspection.
+5. Report approvals: Vendor APPROVER → PENDING_CONSULTANT_APPROVAL, Consultant
+   APPROVER → PENDING_OWNER_CHECK, Owner skip-check → PENDING_OWNER_APPROVAL,
+   Owner APPROVER (`pic@owner.com`) → APPROVED.
+6. Write-back landed: `BoqItemInspectionResult` row (DONE/PASS) for the BOQ item,
+   `QaWriteBackQueue` status SENT, and the readiness endpoint exposes the
+   `inspection_results` entry (the data behind the QA BOQ badge).
+
+All `smoke-*` records were deleted from both databases afterwards (verified 0
+residuals); the dummy-account `qc_function` assignments remain as the production
+integration configuration.
+
 ## PowerQC ↔ Field QA integration activation review (2026-08-27)
 
 - [x] Read the Knowledge Base protocol and mandatory QA/QC governance context.
