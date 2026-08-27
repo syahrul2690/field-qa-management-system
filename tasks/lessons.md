@@ -257,3 +257,11 @@ _This file tracks patterns and corrections to prevent repeated mistakes._
   exact slug and that it supports `tools`. Pin the current family explicitly
   (`anthropic/claude-haiku-4.5`) rather than assuming a product name maps to
   a slug.
+
+### Lesson 31: A global React Query staleTime can hide newly-assigned data from the UI
+- The QA frontend sets `staleTime: 1000 * 60 * 5` globally, so a user's project
+  list was served from cache for 5 minutes after a vendor-visibility assignment —
+  the new project only appeared after a full page reload.
+- Rule: for list views whose contents can change outside the current session
+  (assignments, approvals by others), override the query with a short `staleTime`
+  and `refetchOnMount: 'always'` instead of relying on the global default.
