@@ -63,6 +63,11 @@ export function ProjectListPage() {
   const { data, isLoading, error } = useQuery({
     queryKey: ['projects'],
     queryFn: () => projectApi.list(),
+    // Project visibility changes (e.g. a vendor being assigned a new project)
+    // must appear immediately; the global 5-minute staleTime would otherwise
+    // serve the cached list until a full reload.
+    staleTime: 0,
+    refetchOnMount: 'always',
   });
 
   const projects: Project[] = data?.data?.data ?? [];
