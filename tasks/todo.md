@@ -8,9 +8,9 @@
 - [x] Route PowerQC web login through delegated QA authentication and align its role contract.
 - [x] Implement and test durable retry processing for pending QA write-backs.
 - [x] Run builds/tests for both applications and review the diffs.
-- [ ] Deploy the approved changes and execute non-destructive live smoke tests.
-- [ ] Run a controlled sandbox RFI/write-back walkthrough if suitable test records are available.
-- [ ] Document results, limitations, and rollback evidence.
+- [x] Deploy the approved changes and execute non-destructive live smoke tests.
+- [x] Run a controlled sandbox RFI/write-back walkthrough if suitable test records are available.
+- [x] Document results, limitations, and rollback evidence.
 
 ### Execution Review
 
@@ -30,6 +30,19 @@
   tests and all 24 frontend tests pass; PowerQC API has 11 passing tests and both
   API/web TypeScript checks pass. The one Field QA DB-backed suite and local
   migration rehearsal could not run because local PostgreSQL was unavailable.
+
+## Recent status & fixes (2026-08-27)
+
+- PowerQC ↔ Field QA integration is deployed and verified end-to-end, including a
+  full RFI → inspection → approval → write-back walkthrough with isolated records
+  (detailed notes and the inspection write-back fix are recorded in commits
+  `dd16743`/`0d6b5e8` on `codex/activate-field-qc-integration` and `c1d90f9` on
+  PowerQC master). All smoke records were removed from both databases.
+- Vendor project list fix (`f55fe91` on `main`): the QA frontend's global React
+  Query `staleTime: 5 minutes` was serving a cached `['projects']` list, so a
+  newly vendor-assigned project did not appear until a full reload. The projects
+  page now uses `staleTime: 0` + `refetchOnMount: 'always'`. Frontend build clean,
+  24/24 tests pass.
 
 ## PowerQC ↔ Field QA integration activation review (2026-08-27)
 
