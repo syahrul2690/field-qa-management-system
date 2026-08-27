@@ -35,8 +35,8 @@ ssh qa-vps "docker logs qa-backend --tail 50"
 # Tail frontend logs
 ssh qa-vps "docker logs qa-frontend --tail 20"
 
-# Restart backend (e.g. after .env change)
-ssh qa-vps "docker compose -f ~/field-qa-management-system/docker-compose.prod.yml restart backend"
+# Recreate backend (required after a .env change)
+ssh qa-vps "cd ~/field-qa-management-system && docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate backend"
 
 # Full restart all containers
 ssh qa-vps "cd ~/field-qa-management-system && docker compose -f docker-compose.prod.yml restart"
@@ -365,20 +365,22 @@ ssh -i ~/.ssh/field-qa.pem pusmanpro@YOUR_VPS_IP \
 
 Located at `~/field-qa-management-system/.env`.
 
-Edit directly on the VPS if values need to change — then restart the affected container (no rebuild needed for env-only changes):
+Edit directly on the VPS if values need to change — then recreate the affected container (no image rebuild is needed for env-only changes):
 
 ```bash
 ssh -i ~/.ssh/field-qa.pem pusmanpro@YOUR_VPS_IP \
-  "cd ~/field-qa-management-system && docker compose -f docker-compose.prod.yml restart backend"
+  "cd ~/field-qa-management-system && docker compose -f docker-compose.prod.yml config --quiet && docker compose -f docker-compose.prod.yml up -d --no-deps --force-recreate backend"
 ```
 
-To reload `.env` into a running container, you must restart it. Docker Compose does **not** hot-reload env files.
+To load changed `.env` values, Docker Compose must **recreate** the container. A plain
+`docker compose restart backend` starts the existing container with its old environment
+and therefore does not load the new values.
 
 ---
 
 ## Full Restart (no rebuild)
 
-If containers need restarting without a code change (e.g., after editing `.env`):
+If containers need restarting without a code or environment change:
 
 ```bash
 ssh -i ~/.ssh/field-qa.pem pusmanpro@YOUR_VPS_IP \

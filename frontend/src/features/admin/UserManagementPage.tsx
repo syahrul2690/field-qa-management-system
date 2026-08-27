@@ -18,6 +18,7 @@ interface ManagedUser {
   institution_id: string;
   unit_id: string;
   qc_role?: string | null;
+  qc_function?: string | null;
   institution?: { id: string; name: string; type: string };
   unit?: { id: string; name: string; level: number };
   created_at: string;
@@ -42,7 +43,13 @@ interface EditForm {
   institution_id: string;
   unit_id: string;
   qc_role: string;
+  qc_function: string;
 }
+
+type EditUserPayload = Omit<EditForm, 'qc_role' | 'qc_function'> & {
+  qc_role: string | null;
+  qc_function: string | null;
+};
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -85,6 +92,14 @@ const QC_ROLES = [
   { value: 'QC_LEAD', label: 'QC Lead' },
 ];
 
+const QC_FUNCTIONS = [
+  { value: '', label: 'None (no PowerQC workflow access)' },
+  { value: 'MAKER', label: 'Maker' },
+  { value: 'CHECKER', label: 'Checker' },
+  { value: 'APPROVER', label: 'Approver' },
+  { value: 'ADMIN', label: 'Administrator' },
+];
+
 // ─── Edit User Modal ──────────────────────────────────────────────────────────
 
 function EditUserModal({
@@ -104,6 +119,7 @@ function EditUserModal({
     institution_id: user.institution_id ?? user.institution?.id ?? '',
     unit_id:        user.unit_id        ?? user.unit?.id         ?? '',
     qc_role:        user.qc_role ?? '',
+    qc_function:    user.qc_function ?? '',
   });
 
   // Institutions list
@@ -133,7 +149,7 @@ function EditUserModal({
   }, [form.institution_id]);
 
   const updateMutation = useMutation({
-    mutationFn: (body: Partial<EditForm>) =>
+    mutationFn: (body: EditUserPayload) =>
       apiClient.patch(`/admin/users/${user.id}`, body),
     onSuccess: () => {
       addToast('success', 'User updated successfully.');
@@ -151,7 +167,11 @@ function EditUserModal({
     if (!form.role)                return addToast('error', 'Role is required.');
     if (!form.institution_id)      return addToast('error', 'Institution is required.');
     if (!form.unit_id)             return addToast('error', 'Unit is required.');
-    updateMutation.mutate({ ...form, qc_role: form.qc_role || null } as any);
+    updateMutation.mutate({
+      ...form,
+      qc_role: form.qc_role || null,
+      qc_function: form.qc_function || null,
+    });
   };
 
   return (
@@ -203,9 +223,9 @@ function EditUserModal({
           </p>
         </div>
 
-        {/* QC Role */}
+        {/* Legacy QC role retained while older PowerQC clients are upgraded */}
         <div>
-          <label className="label">Field QC Role</label>
+          <label className="label">Legacy Field QC Role</label>
           <select
             className="input"
             value={form.qc_role}
@@ -216,7 +236,24 @@ function EditUserModal({
             ))}
           </select>
           <p className="text-[11px] text-gray-400 mt-1">
-            Grants access to the Field QC app. Leave as "None" if this user only uses QA.
+            Compatibility field for older PowerQC clients. New workflow authorization uses PowerQC Function below.
+          </p>
+        </div>
+
+        {/* Canonical PowerQC workflow function */}
+        <div>
+          <label className="label">PowerQC Function</label>
+          <select
+            className="input"
+            value={form.qc_function}
+            onChange={(e) => setForm((f) => ({ ...f, qc_function: e.target.value }))}
+          >
+            {QC_FUNCTIONS.map((entry) => (
+              <option key={entry.value} value={entry.value}>{entry.label}</option>
+            ))}
+          </select>
+          <p className="text-[11px] text-gray-400 mt-1">
+            Combined with the institution type to authorize Maker, Checker, Approver, or Admin actions in PowerQC.
           </p>
         </div>
 
@@ -431,6 +468,11 @@ export function UserManagementPage() {
                           {user.qc_role && (
                             <span className="badge bg-emerald-100 text-emerald-700 text-[10px]">
                               QC: {user.qc_role.replace(/_/g, ' ')}
+                            </span>
+                          )}
+                          {user.qc_function && (
+                            <span className="badge bg-blue-100 text-blue-700 text-[10px]">
+                              PowerQC: {user.qc_function.replace(/_/g, ' ')}
                             </span>
                           )}
                         </div>

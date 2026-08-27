@@ -105,6 +105,17 @@ enum QcRole {
   QC_LEAD
 }
 
+// Cross-application Field QC workflow function. The user's institution supplies
+// the organization side (OWNER / CONSULTANT / VENDOR); this field supplies the
+// action they may perform in PowerQC. QcRole remains temporarily for backwards
+// compatibility with already-deployed clients.
+enum QcFunction {
+  MAKER
+  CHECKER
+  APPROVER
+  ADMIN
+}
+
 // PLN hold-point authority codes (per Knowledge_Base/agent.md + 04_Project_Quality_Plan_Field.md).
 // A single ITP row can carry a different code per responsible party — see
 // ItpItem.sub_code / pp_code / pln_code.
@@ -185,6 +196,7 @@ model User {
   institution_id String
   unit_id        String
   qc_role        QcRole?
+  qc_function    QcFunction?
 
   institution Institution @relation(fields: [institution_id], references: [id])
   unit        Unit        @relation(fields: [unit_id], references: [id])
