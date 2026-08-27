@@ -7,6 +7,8 @@ import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { DocumentUploadForm } from '../documents/DocumentUploadForm';
 import { DocumentDetailModal } from '../documents/DocumentDetailModal';
 import { DocumentReviseForm } from '../documents/DocumentReviseForm';
+import { boqApi } from '../../services/boqApi';
+import { InspectionResult, InspectionResultsSection } from './InspectionResultsSection';
 
 interface BoqItem {
   id: string;
@@ -66,7 +68,19 @@ export function BoqItemDetailPanel({ item, onClose }: BoqItemDetailPanelProps) {
     enabled: !!item,
   });
 
+  const {
+    data: itemDetailData,
+    isLoading: inspectionResultsLoading,
+    isError: inspectionResultsError,
+  } = useQuery({
+    queryKey: ['boq-item', item?.id],
+    queryFn: () => boqApi.getItem(item!.id),
+    enabled: !!item,
+  });
+
   const documents: Document[] = data?.data?.data ?? [];
+  const inspectionResults: InspectionResult[] =
+    itemDetailData?.data?.data?.inspection_results ?? [];
 
   if (!item) return null;
 
@@ -92,6 +106,12 @@ export function BoqItemDetailPanel({ item, onClose }: BoqItemDetailPanelProps) {
             </svg>
           </button>
         </div>
+
+        <InspectionResultsSection
+          results={inspectionResults}
+          isLoading={inspectionResultsLoading}
+          isError={inspectionResultsError}
+        />
 
         {/* Section tabs */}
         <div className="flex border-b border-gray-200 px-6">
@@ -233,5 +253,4 @@ export function BoqItemDetailPanel({ item, onClose }: BoqItemDetailPanelProps) {
     </>
   );
 }
-
 

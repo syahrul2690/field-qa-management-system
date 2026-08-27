@@ -1,5 +1,65 @@
 # Context Review — 2026-07-01
 
+## PowerQC ↔ Field QA integration execution (2026-08-27)
+
+- [x] Preflight both worktrees and confirm the deployed configuration without exposing secrets.
+- [x] Wire and test Field QA's production integration environment.
+- [x] Add Field QA inspection-result visibility and integration regression coverage.
+- [x] Route PowerQC web login through delegated QA authentication and align its role contract.
+- [x] Implement and test durable retry processing for pending QA write-backs.
+- [x] Run builds/tests for both applications and review the diffs.
+- [ ] Deploy the approved changes and execute non-destructive live smoke tests.
+- [ ] Run a controlled sandbox RFI/write-back walkthrough if suitable test records are available.
+- [ ] Document results, limitations, and rollback evidence.
+
+### Execution Review
+
+- Live preflight found both stacks healthy. PowerQC had `QA_API_URL` and
+  `QA_INTEGRATION_API_KEY` loaded; Field QA lacked the matching key in both its
+  `.env` and running backend container. The key was copied without printing it,
+  after creating a timestamped `.env` backup.
+- Field QA now requires the integration key in production Compose, exposes the
+  additive institution-aware `qc_function` contract while retaining `qc_role`,
+  and displays PowerQC inspection-result ledger entries in the BOQ detail panel.
+- PowerQC web login now delegates to Field QA. Authorization prefers
+  `qc_function`, rejects invalid institution/function pairs, and keeps a limited
+  fail-closed compatibility mapping for legacy `qc_role` values.
+- PowerQC now drains pending QA write-backs with database claims, stale-lease
+  recovery, capped exponential backoff, and idempotent receiver semantics.
+- Verification so far: Field QA backend/frontend builds pass; 119 non-DB backend
+  tests and all 24 frontend tests pass; PowerQC API has 11 passing tests and both
+  API/web TypeScript checks pass. The one Field QA DB-backed suite and local
+  migration rehearsal could not run because local PostgreSQL was unavailable.
+
+## PowerQC ↔ Field QA integration activation review (2026-08-27)
+
+- [x] Read the Knowledge Base protocol and mandatory QA/QC governance context.
+- [x] Verify the Field QA integration environment variable and production Compose wiring.
+- [x] Map the integration endpoints, authentication contract, and `qc_role` requirements.
+- [x] Define a secret-safe VPS activation and rollback procedure.
+- [x] Define end-to-end checks for projects/BOQ, QA login, RFI readiness, and final-inspection write-back.
+- [x] Record verified findings and remaining uncertainties in the review section.
+
+### Review
+
+- Confirmed the reported HTTP 500 is emitted by Field QA when `INTEGRATION_API_KEY`
+  is absent from the backend container. The production Compose file currently does
+  not pass that variable, although `.env.example` documents it.
+- The safe activation order is: place the matching secret in the VPS `.env`, deploy
+  the Compose mapping, validate Compose without printing its resolved config, and
+  recreate only the `backend` service. `docker compose restart` does not reload a
+  changed container environment; existing deployment documentation is incorrect on
+  this point.
+- All integration routes use `X-API-Key`. Field QA readiness requires exactly one
+  current document in each of FIELD_ITP, PROCEDURE, and WORK_METHOD, with Status A or
+  B. Write-back is an idempotent BOQ inspection-result ledger update.
+- Remaining end-to-end blockers found in PowerQC: its web login still calls the local
+  login endpoint instead of delegated QA login; its institution/function mapping does
+  not match Field QA's current `qc_role` enum; and the pending write-back queue has no
+  verified retry consumer. Field QA also has no current BOQ UI badge for the ledger.
+- No production/VPS changes were made during this review. Integration endpoint tests
+  are absent, so controlled live smoke testing is required after activation.
+
 - [x] Review existing task tracker and lessons learned
 - [x] Inspect current backend, frontend, shared, and deployment entry points
 - [x] Verify current build/test status with targeted commands

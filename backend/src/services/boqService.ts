@@ -112,6 +112,19 @@ export async function getBoqItem(itemId: string) {
           created_at: true,
         },
       },
+      inspection_results: {
+        orderBy: { updated_at: 'desc' },
+        select: {
+          id: true,
+          inspection_report_id: true,
+          revision_no: true,
+          status: true,
+          result: true,
+          report_pdf_url: true,
+          received_at: true,
+          updated_at: true,
+        },
+      },
       children: {
         select: { id: true, item_code: true, title: true, level: true, sort_order: true },
         orderBy: { sort_order: 'asc' },
