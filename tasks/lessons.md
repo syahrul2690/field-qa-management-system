@@ -257,3 +257,25 @@ _This file tracks patterns and corrections to prevent repeated mistakes._
   exact slug and that it supports `tools`. Pin the current family explicitly
   (`anthropic/claude-haiku-4.5`) rather than assuming a product name maps to
   a slug.
+
+## Session: 2026-08-27 — PowerQC activation deploy on the shared VPS
+
+### Lesson 28: Never run a full `docker compose up --build -d` on the 2 GB VPS while all stacks are live
+- The PowerQC Dockerfile set (pnpm install + Nest build + Next.js webpack) run in
+  parallel by default. On the 2 vCPU / 1.9 GB RAM VPS with 11+ production
+  containers running, this saturated the host: SSH banner exchange timed out,
+  all public endpoints returned 000, and only raw TCP still connected. The machine
+  did not recover on its own; a console reboot was required.
+- Fixes that worked: `docker builder prune -f` first (31 GB build cache reclaimed),
+  then build images **sequentially** (`docker compose build api`, then `build web`)
+  with streaming output (no `| tail` buffering) so progress and stalls are visible.
+- The durable fix is the Field QA pattern: build images in GitHub Actions, push to
+  GHCR, and only `pull`/`up -d` on the VPS. PowerQC still uses on-VPS builds in its
+  DEPLOYMENT.md and should migrate.
+
+### Lesson 29: Prefer streaming remote build output over piped `tail`
+- `docker compose ... build 2>&1 | tail -30` on a remote host buffers all output
+  until the command exits, so a long or stalled build shows zero progress and you
+  cannot tell a slow build from a hung one. Run builds in a PTY without the pipe,
+  or stream to a log, so progress is visible and an abort is possible before the
+  host becomes unresponsive.

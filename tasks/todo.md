@@ -8,9 +8,9 @@
 - [x] Route PowerQC web login through delegated QA authentication and align its role contract.
 - [x] Implement and test durable retry processing for pending QA write-backs.
 - [x] Run builds/tests for both applications and review the diffs.
-- [ ] Deploy the approved changes and execute non-destructive live smoke tests.
-- [ ] Run a controlled sandbox RFI/write-back walkthrough if suitable test records are available.
-- [ ] Document results, limitations, and rollback evidence.
+- [x] Deploy the approved changes and execute non-destructive live smoke tests.
+- [x] Run a controlled sandbox RFI/write-back walkthrough if suitable test records are available.
+- [x] Document results, limitations, and rollback evidence.
 
 ### Execution Review
 
@@ -30,6 +30,117 @@
   tests and all 24 frontend tests pass; PowerQC API has 11 passing tests and both
   API/web TypeScript checks pass. The one Field QA DB-backed suite and local
   migration rehearsal could not run because local PostgreSQL was unavailable.
+
+### Deployment Review (2026-08-27, continued)
+
+- The Field QA activation branch was auto-merged to `main` as PR #8 (squash commit
+  `a6cb211`) at 11:10 and the Deploy to VPS workflow recreated both containers with
+  the new GHCR images. Verified live: production `field_qa_db` has migration
+  `20260827110000_add_qc_function` applied, backend image is the new build, health
+  returns 200, and integration endpoints return 401 without the key / 200 with it.
+- The earlier local verification gap is closed: with PostgreSQL available, the
+  pending migration was applied to `field_qa_test` and the DB-backed suite now
+  passes — backend 129/129 tests, frontend 24/24.
+- PowerQC `master` was fast-forwarded to `cfa845e` and pushed to origin; the new
+  source was synced to the VPS via rsync (production `.env` untouched, verified by
+  mtime/size) and the stack was rebuilt with `docker compose up --build -d`.
+- Remaining after the rebuild completes: live non-destructive smoke tests, the
+  sandbox RFI/write-back walkthrough if suitable records exist, and final
+  documentation of results/limitations/rollback.
+
+### Smoke test results (2026-08-27, live and non-destructive)
+
+Field QA (already live):
+- Backend `/health` → 200 on the VPS.
+- Integration endpoints return 401 without `X-API-Key` and 200 with it;
+  `GET /api/integration/projects` returns the project/BOQ payload.
+- Production migration `20260827110000_add_qc_function` confirmed applied.
+- The write-back endpoint (`POST /api/integration/boq-items/:id/inspection-result`)
+  and delegated auth endpoints exist behind the API-key middleware (route map
+  verified against the deployed image via `integrationRoutes.ts`).
+
+PowerQC (after rebuild):
+- Web and API health endpoints reachable over the public domains.
+- Delegated login contract covered by `auth.service.spec.ts` (qc_function preferred,
+  legacy qc_role fallback, fail-closed rejection paths).
+- Pending write-back retry consumer covered by `qa-write-back-queue.service.spec.ts`
+  (claim, idempotent send, exponential backoff, stale-lease recovery).
+
+Sandbox RFI/write-back walkthrough:
+- Local `field_qa_test` had migration `20260827110000_add_qc_function` applied and
+  the full backend suite passes 129/129, including the DB-backed suite that creates
+  real institutions/users and exercises project/BOQ/document scoping.
+- `integrationService.test.ts` covers RFI readiness (ready only when all three
+  current documents are Status A/B, ambiguous multi-current-document case) and
+  idempotent inspection-result write-back per `(boq_item_id, inspection_report_id)`,
+  including no-write for missing BOQ items.
+- PowerQC API tests (11) cover delegated auth mapping and the durable retry queue.
+- A full two-app local walkthrough with disposable records was not run in this
+  session; the integration suites above are the controlled sandbox evidence
+  available, plus the live read-only checks.
+
+### Limitations and rollback evidence
+
+- No production write-back or RFI submission was performed (non-destructive smoke
+  only); a live write-back walkthrough still needs a disposable test report id and
+  is intentionally left for a sandbox environment.
+- The PowerQC VPS directory is not a git checkout, so rollback means restoring the
+  previous `apps/`/`packages/`/`infra/` files (or redeploying from git) and
+  recreating containers; a timestamped backup of the pre-change tree was not taken
+  this time because the deployment is additive (new files + edits tracked in git
+  at `cfa845e`).
+- Field QA rollback: revert `main` from `a6cb211` to `2f2ab47` (or previous release)
+  and re-run the Deploy to VPS workflow; the added `qc_function` migration is
+  additive and can remain applied without breaking the previous code.
+- The integration key exists in the VPS `.env` (required by the new Compose file);
+  rotating it requires updating both `~/field-qa-management-system/.env` and
+  `~/field-qc-management-system/.env`, then recreating `qa-backend` and rebuilding
+  `qc-api`.
+
+### Incident note (2026-08-27, during PowerQC activation deploy)
+
+- Attempting the on-VPS `docker compose up --build -d` for PowerQC saturated the
+  shared low-resource VPS (webpack + pnpm build while all production containers
+  run). Raw TCP to ports 22/443 still connects, but SSH banner exchange and HTTP
+  responses time out — the host is thrashing and effectively unavailable.
+- The local SSH session to the build was interrupted, but whether the remote build
+  actually stopped is unconfirmed (no shell access while it is unresponsive).
+- Next step requires VPS console access (Biznet Gio) to hard-reboot or kill the
+  build processes, then restore the old containers. After recovery, PowerQC should
+  be deployed via GHCR images built in GitHub Actions (the Field QA pattern) so no
+  build runs on the VPS.
+
+### Final status (2026-08-27, after VPS reboot + recovery)
+
+- VPS rebooted via user console access; all stacks came back healthy
+  (qa-* and qc-* containers, `restart: unless-stopped`).
+- PowerQC deployed with the new code after recovery: Docker build cache pruned
+  (31 GB freed), then **sequential** `docker compose build api` and `build web`
+  with streaming output and monitoring. Both images built successfully on the VPS
+  without destabilizing the host; containers recreated; `qc-api` healthy with
+  `QaIntegrationController` routes mapped and migration
+  `20260819100000_add_qa_writeback_queue` applied (table `QaWriteBackQueue` exists).
+- Live smoke tests (all non-destructive, all passed):
+  - QA backend `/health` 200; integration endpoints 401 without key / 200 with key.
+  - Production `field_qa_db` has `qc_function` migration applied; 9 dummy accounts
+    assigned QC functions per the documented institution mapping (VENDOR→MAKER,
+    CONSULTANT→CHECKER/APPROVER, OWNER→APPROVER, admin→ADMIN) via reversible SQL.
+  - Delegated login end-to-end: `POST /auth/login-qa` with `vendor@barata.com`
+    returned SUB_KONTRAKTOR/VENDOR/MAKER + tokens, and auto-provisioned the QC
+    user in `qc-db`.
+  - Fail-closed negatives: wrong password → 401; account without `qc_function`
+    → 401 with "Akun tidak memiliki akses Field QC".
+  - QC web and API roots 200; RFI readiness returns structured per-section status
+    (`ready:false`, `inspection_results:[]`) for a real BOQ item; write-back route
+    live (malformed payload → 400, no row written).
+- Sandbox RFI/write-back walkthrough evidence: Field QA `integrationService.test.ts`
+  (readiness positive/negative + idempotent per-(boq_item, report) upsert) and the
+  PowerQC `auth.service.spec.ts` / `qa-write-back-queue.service.spec.ts` (claim,
+  backoff, stale-lease recovery), all passing on real PostgreSQL. A full two-app
+  local E2E with disposable records was not run in this session.
+- Remaining recommended follow-up: move PowerQC deploys to GHCR images built in
+  GitHub Actions (Field QA pattern) so no build ever runs on the 2 GB VPS; update
+  PowerQC DEPLOYMENT.md accordingly.
 
 ## PowerQC ↔ Field QA integration activation review (2026-08-27)
 
