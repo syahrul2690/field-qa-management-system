@@ -437,6 +437,27 @@ export async function assertProjectConsultantPic(projectId: string, consultantId
   if (!assignment) throw new AppError('You are not assigned as PIC Consultant for this project', 403);
 }
 
+/**
+ * Delegation/team-setup authorization that stays consistent with queue
+ * visibility: an explicit project PIC assignment always gates access, but
+ * projects created before the assignment feature (no ProjectConsultantPic rows)
+ * keep the legacy fallback where any Consultant PIC can act on them.
+ */
+export async function assertProjectConsultantPicOrLegacy(
+  projectId: string,
+  consultantId: string,
+) {
+  const [assignment, assignmentCount] = await Promise.all([
+    prisma.projectConsultantPic.findUnique({
+      where: { project_id_consultant_id: { project_id: projectId, consultant_id: consultantId } },
+    }),
+    prisma.projectConsultantPic.count({ where: { project_id: projectId } }),
+  ]);
+  if (assignment) return;
+  if (assignmentCount === 0) return; // legacy fallback — no explicit PIC assignment yet
+  throw new AppError('You are not assigned as PIC Consultant for this project', 403);
+}
+
 // ── Dashboard aggregation ─────────────────────────────────────────────────────
 
 export async function getDashboardData(filters: {

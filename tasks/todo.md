@@ -44,6 +44,28 @@
   page now uses `staleTime: 0` + `refetchOnMount: 'always'`. Frontend build clean,
   24/24 tests pass.
 
+## PIC Consultant team-assignment authorization fix (2026-08-27)
+
+- [x] Root cause: queue visibility had a legacy fallback (projects without any
+      `ProjectConsultantPic` row remain visible to every Consultant PIC), but the
+      delegation/team-setup actions used a strict `assertProjectConsultantPic`
+      check with no fallback. With zero assignment rows in production, the PIC
+      Consultant could see reviews but every assign/delegate call returned 403
+      ("You are not assigned as PIC Consultant for this project").
+- [x] Fix: added `assertProjectConsultantPicOrLegacy` in `projectService` and used
+      it in `delegateReview`, `listDelegationCandidates`, and `assignReviewTeam` —
+      an explicit assignment always gates access; projects with no assignment rows
+      keep the legacy fallback (any Consultant PIC may act), matching visibility.
+- [x] Tests: new `reviewService.consultantPicAuthorization.test.ts` (explicit
+      assignment allowed, legacy fallback allowed, other-consultant assignment
+      rejected, fallback applied at the delegation gate). Backend 133/133,
+      build clean.
+
+### Review
+- Explicit per-project PIC assignment (project detail page) remains the correct
+  long-term setup; the fallback only preserves pre-existing projects that were
+  never assigned.
+
 ## PowerQC ↔ Field QA integration activation review (2026-08-27)
 
 - [x] Read the Knowledge Base protocol and mandatory QA/QC governance context.

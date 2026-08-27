@@ -265,3 +265,12 @@ _This file tracks patterns and corrections to prevent repeated mistakes._
 - Rule: for list views whose contents can change outside the current session
   (assignments, approvals by others), override the query with a short `staleTime`
   and `refetchOnMount: 'always'` instead of relying on the global default.
+
+### Lesson 32: Visibility fallback and action authorization must stay in sync
+- The PIC Consultant queue had a legacy fallback (projects with no
+  `ProjectConsultantPic` row were visible to every Consultant PIC), but the
+  delegate/assign actions required an explicit assignment and 403'd otherwise —
+  users could see reviews they could not act on.
+- Rule: when adding a legacy fallback to list visibility, apply the same fallback
+  to the corresponding mutating actions, or the UI will show items the user
+  cannot work on.

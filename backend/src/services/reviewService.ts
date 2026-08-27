@@ -8,7 +8,7 @@ import path from 'path';
 import fs from 'fs';
 import { buildReviewScopeWhere, type ScopeUser } from './accessScopeService';
 import { getFilePath } from './fileStorageService';
-import { assertProjectConsultantPic } from './projectService';
+import { assertProjectConsultantPicOrLegacy } from './projectService';
 import { getDelegationScope } from './reviewAuthorization';
 
 // ── submitForReview ──────────────────────────────────────────────────────────
@@ -97,7 +97,7 @@ export async function delegateReview(
     throw new AppError('You can only delegate reviews in your owner-unit scope', 403);
   }
   if (delegationScope === 'CONSULTANT_PROJECT') {
-    await assertProjectConsultantPic(review.document.boq_item.project_id, actorId);
+    await assertProjectConsultantPicOrLegacy(review.document.boq_item.project_id, actorId);
   }
   if (review.reviewed_at) throw new AppError('Review cannot be re-delegated after review begins', 400);
   if (!engineer || engineer.status !== 'APPROVED' || engineer.role !== Role.REVIEWER || engineer.institution.type !== 'CONSULTANT') {
@@ -151,7 +151,7 @@ export async function listDelegationCandidates(reviewId: string, actorId: string
     throw new AppError('Insufficient delegation scope', 403);
   }
   if (delegationScope === 'CONSULTANT_PROJECT') {
-    await assertProjectConsultantPic(review.document.boq_item.project_id, actorId);
+    await assertProjectConsultantPicOrLegacy(review.document.boq_item.project_id, actorId);
   }
   const unitLevel = review.document.section === DocumentSection.WORK_METHOD ? 2 : 1;
   return prisma.user.findMany({
@@ -190,7 +190,7 @@ export async function assignReviewTeam(
   if (!actor || actor.role !== Role.PIC_CONSULTANT) {
     throw new AppError('Only PIC Consultant can assign a review team.', 403);
   }
-  await assertProjectConsultantPic(review.document.boq_item.project_id, actorId);
+  await assertProjectConsultantPicOrLegacy(review.document.boq_item.project_id, actorId);
   if (data.reviewer_id) {
     throw new AppError('PIC Consultant no longer assigns the Reviewer; use the PIC Engineer delegation gate.', 403);
   }
