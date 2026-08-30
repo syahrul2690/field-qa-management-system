@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { format, parseISO } from 'date-fns';
 import { reviewApi } from '../../services/reviewApi';
+import { documentApi } from '../../services/documentApi';
 import { getPublicFileUrl } from '../../services/fileUrl';
 import { useAuthStore } from '../../store/authStore';
 import { useUIStore } from '../../store/uiStore';
@@ -578,7 +579,7 @@ function ItpItemPanel({ documentId, canEdit, role }: ItpItemPanelProps) {
 
   const { data: itemsData, isLoading, isError, refetch } = useQuery({
     queryKey: ['itp-items', documentId],
-    queryFn: () => reviewApi.getItpItems(documentId),
+    queryFn: () => documentApi.getItpItems(documentId),
   });
 
   const savedItems: ItpItem[] = itemsData?.data?.data ?? [];
@@ -613,7 +614,7 @@ function ItpItemPanel({ documentId, canEdit, role }: ItpItemPanelProps) {
 
   const saveMutation = useMutation({
     mutationFn: () =>
-      reviewApi.saveItpItems(
+      documentApi.saveItpItems(
         documentId,
         (localItems ?? [])
           .filter(i => i.activity.trim())
@@ -1041,11 +1042,9 @@ export function ReviewDetailPage() {
 
   // ITP Items panel — only for FIELD_ITP documents
   const isItpDocument = review?.section === 'FIELD_ITP';
-  const canEditItpItems =
-    isItpDocument && (
-      (isReviewer && review?.current_stage === 'REVIEW' && isAssignedOrOpenReviewer) ||
-      (isChecker  && review?.current_stage === 'CHECK'  && review?.checker?.id === user?.id)
-    );
+  // Inspection Items are authored by the Vendor while the document is a draft.
+  // Review participants can inspect the rows here, but cannot edit them.
+  const canEditItpItems = false;
   const showItpPanel = isItpDocument && showCommentSheet;
 
   if (isLoading) return <div className="py-12"><LoadingSpinner size="lg" /></div>;

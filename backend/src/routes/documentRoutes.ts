@@ -4,7 +4,6 @@ import { requireRole, requireInstitution } from '../middlewares/roleMiddleware';
 import { uploadPdfs } from '../middlewares/uploadMiddleware';
 import { Role, InstitutionType } from '@prisma/client';
 import * as documentController from '../controllers/documentController';
-import { getItpItems, saveItpItems } from '../controllers/reviewController';
 
 export const documentRoutes = Router();
 
@@ -46,13 +45,13 @@ documentRoutes.get('/history', authMiddleware, documentController.getDocumentHis
 documentRoutes.get('/:documentId', authMiddleware, documentController.getDocument);
 
 // GET /api/documents/:documentId/itp-items — List ITP inspection items (authenticated)
-documentRoutes.get('/:documentId/itp-items', authMiddleware, getItpItems);
+documentRoutes.get('/:documentId/itp-items', authMiddleware, documentController.getItpItems);
 
-// PUT /api/documents/:documentId/itp-items — Vendor may prepare draft ITP rows;
-// Reviewer/Checker may refine them during the review workflow.
+// PUT /api/documents/:documentId/itp-items — Vendor-only current FIELD_ITP draft.
 documentRoutes.put(
   '/:documentId/itp-items',
   authMiddleware,
-  requireRole(Role.VENDOR, Role.REVIEWER, Role.CHECKER),
-  saveItpItems,
+  requireRole(Role.VENDOR),
+  requireInstitution(InstitutionType.VENDOR),
+  documentController.saveItpItems,
 );

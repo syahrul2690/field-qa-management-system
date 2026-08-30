@@ -310,27 +310,3 @@ export const getNotifications = asyncHandler(async (req: Request, res: Response)
   const notifications = await reviewService.getNotifications(id, role as Role);
   res.json({ success: true, data: notifications });
 });
-
-// GET /documents/:documentId/itp-items
-export const getItpItems = asyncHandler(async (req: Request, res: Response) => {
-  const { documentId } = req.params;
-  const items = await reviewService.getItpItems(documentId);
-  res.json({ success: true, data: items });
-});
-
-// PUT /documents/:documentId/itp-items
-// Body: { items: [{ seq_no, activity, acceptance_criteria?, reference_standard?, verifying_document?, inspection_level?, phase?, category }] }
-// Requires REVIEWER or CHECKER role
-export const saveItpItems = asyncHandler(async (req: Request, res: Response) => {
-  const { documentId } = req.params;
-  const { items = [] } = req.body;
-
-  const result = await reviewService.saveItpItems(
-    documentId,
-    req.user!.id,
-    req.user!.role as Role,
-    items,
-  );
-
-  res.json({ success: true, data: result });
-});

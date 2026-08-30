@@ -536,3 +536,233 @@ leakage into the chat bubble.
 - [x] Run CI on every push to `codex/**`.
 - [x] Run the auto-merge gate after successful `pull_request` or `push` CI runs for `codex/**`.
 - [x] Remove the fixed 10-minute monitor because it is not event-driven.
+
+# 2026-08-30 — Move Inspection Item input from Reviewer to Vendor
+
+## Objective
+
+Make the Vendor the only role that can create, edit, and delete Inspection
+Items for a Field ITP. The Vendor completes the rows while the current document
+is a draft, explicitly submits the document, and all roles see the rows as
+read-only after submission. Reviewer and Checker must no longer be able to
+overwrite Vendor-owned Inspection Items.
+
+This work corrects a partial implementation: the endpoint is document-scoped
+and revisions already copy Inspection Items forward, but the editor and most of
+the authorization contract still belong to the review workflow.
+
+## Confirmed current-state gaps
+
+- [x] Confirm the editor exists only in `ReviewDetailPage.tsx` and is editable by
+      assigned Reviewer/Checker.
+- [x] Confirm the Vendor document modal tells the user to complete ITP rows but
+      does not provide an Inspection Item editor.
+- [x] Confirm `PUT /documents/:documentId/itp-items` still permits Vendor,
+      Reviewer, and Checker.
+- [x] Confirm initial uploads are submitted immediately, leaving no Vendor
+      editing window for revision 0.
+- [x] Confirm new revisions already remain `DRAFT` and copy Inspection Items
+      from the preceding revision.
+- [x] Confirm the existing backend tests encode the obsolete Reviewer/Checker
+      write policy.
+
+## Scope decisions
+
+- Field ITP initial uploads will remain `DRAFT`; the Vendor explicitly submits
+  them after completing the Inspection Items. This behavior change is limited
+  to `FIELD_ITP` in this work so Procedure and Work Method submission behavior
+  is not changed incidentally.
+- Only the latest/current `DRAFT` revision is editable. A historical
+  `REJECTED_C` revision remains immutable; the Vendor uses the existing revision
+  flow, whose new revision is an editable draft with copied rows.
+- Vendor ownership is institution-based and document-scoped. An authorized
+  Vendor colleague from the owning institution may continue the draft; access
+  is not restricted to the individual uploader. Because `Document` currently
+  stores only `uploaded_by`, add an immutable `vendor_institution_id` ownership
+  snapshot rather than deriving ownership from the uploader's potentially
+  changeable current institution.
+- Review participants retain read access. Per-item consultant comments are not
+  part of this change; reviewers continue using the existing Comment Sheet.
+- Submission is not made dependent on a non-zero row count in this change.
+  This avoids introducing a new business validation rule without approval.
+
+## Implementation tracking
+
+### 1. Backend domain ownership and authorization
+
+- [x] Move `getItpItems` and `saveItpItems` from `reviewService` to
+      `documentService`, and move their controller handlers from the review
+      controller to the document controller.
+- [x] Keep the resource URLs under `/documents/:documentId/itp-items`.
+- [x] Restrict the PUT route middleware to `VENDOR` users from a Vendor
+      institution; remove Reviewer and Checker write permission.
+- [x] Add `Document.vendor_institution_id`, its Vendor-institution
+      relation/index, and a migration that backfills existing Vendor-uploaded
+      documents from the uploader's institution. The migration fails safely if
+      any legacy row cannot be mapped rather than guessing an institution.
+- [x] Set `vendor_institution_id` on every new document and inherit the same
+      immutable value on every revision.
+- [x] Enforce service-level authorization independently of route middleware:
+      the document must exist, be visible to the actor, belong to the actor's
+      Vendor institution, be the current revision, have section `FIELD_ITP`,
+      and have status `DRAFT`.
+- [x] Apply document/project scope to GET so a guessed document ID cannot expose
+      Inspection Items outside the actor's authorized projects.
+- [ ] Keep this read-hardening scoped to the Inspection Item GET endpoint.
+      Retrofitting all existing document list/get/history endpoints is a known,
+      separate REST authorization project and is not silently included here.
+- [x] Return stable, actionable `403` messages for wrong institution, wrong
+      role, non-current revision, and locked status.
+- [x] Validate the write payload at the controller boundary: `items` must be an
+      array; every retained row must have a trimmed, nonblank activity and valid
+      phase/category/responsibility enums. Normalize `seq_no` server-side to
+      contiguous `1..N` using submitted array order rather than trusting client
+      sequence values.
+- [x] Preserve atomic whole-table replacement. Institution colleagues share
+      this draft and the existing last-successful-save-wins behavior is accepted
+      for this change; optimistic concurrency/versioning is explicitly out of
+      scope and should be considered separately if concurrent Vendor editing is
+      observed.
+
+### 2. Field ITP draft lifecycle
+
+- [x] Change initial `FIELD_ITP` upload from automatic submission to draft
+      creation; do not create a review or start the SLA at upload time.
+- [x] Preserve the current automatic submission behavior for `PROCEDURE` and
+      `WORK_METHOD` unless a separate workflow change is approved.
+- [x] Keep explicit submission as the transition from `DRAFT` into the review
+      workflow and the SLA start event.
+- [x] Preserve revision copy-forward: the new revision starts as `DRAFT`, copies
+      every Inspection Item, and leaves the old revision unchanged.
+
+### 3. Vendor editor and Reviewer read-only view
+
+- [x] Extract the Inspection Item table/editor from `ReviewDetailPage.tsx` into
+      a reusable document-owned component.
+- [x] Add Inspection Item methods to `documentApi` and remove them from
+      `reviewApi`.
+- [x] Mount the component in `DocumentDetailModal.tsx` for `FIELD_ITP` documents.
+- [x] Enable editing only when the viewer is an authorized Vendor and the
+      displayed version is the latest/current `DRAFT`.
+- [x] Keep the Inspection Item table in Review Detail as read-only for Reviewer,
+      Checker, Approver, PIC, and other already-authorized viewers.
+- [x] Remove Reviewer/Checker editing controls and the obsolete “As Reviewer” /
+      “As Checker” instructional copy.
+- [x] Ensure a draft with no saved rows shows an honest empty/editor state and a
+      submitted document with no rows shows an honest read-only empty state.
+
+### 4. “Draft created — what next?” user guidance
+
+- [x] Replace the Field ITP upload success message with:
+      **“Field ITP draft created. Next, add and save the Inspection Items, then
+      submit the draft for review.”**
+- [x] Define the upload-to-editor data flow explicitly: `DocumentUploadForm`
+      captures the created document returned by the API and calls an
+      `onCreated(document)` callback; `BoqItemDetailPanel` closes the upload
+      form, sets `selectedDoc`, and automatically opens `DocumentDetailModal`
+      for that exact new draft.
+- [x] Treat the automatic opening of Document Details as the primary next
+      action, and focus/position the user at the Inspection Item section. Do not
+      leave the user to rediscover the draft in the document list.
+- [x] In the draft detail view, show a persistent guidance banner with this
+      sequence:
+      **1. Review uploaded files → 2. Add Inspection Items → 3. Save items →
+      4. Submit for Review.**
+- [x] Keep **Submit for Review** visible in the draft view, visually separated
+      from **Save ITP Items**, and explain that submission locks the rows and
+      starts the review process.
+- [x] Warn about unsaved Inspection Item changes if the Vendor attempts to
+      submit or close the editor while the table is dirty.
+- [x] After successful submission, replace the draft instructions with a clear
+      read-only confirmation: **“Submitted for review. Inspection Items are now
+      locked.”**
+- [x] If the user closes the success flow, keep the document discoverable with
+      its `DRAFT` badge and the same next-step guidance when reopened.
+
+### 5. Automated verification
+
+- [x] Replace the obsolete `reviewService.itpItems.test.ts` coverage with
+      document-domain service tests.
+- [x] Test owning Vendor institution + current Field ITP draft ⇒ save succeeds.
+- [ ] Test document ownership snapshot creation, revision inheritance, and
+      migration backfill; unmappable legacy ownership must remain null and deny
+      mutation until administratively resolved.
+- [x] Test a different Vendor institution, Reviewer, Checker, and other roles ⇒
+      `403`, with no delete/create mutation executed.
+- [ ] Test non-current revision, non-Field-ITP section, `SUBMITTED`, active
+      review, and final statuses ⇒ locked with no mutation.
+- [ ] Test scope-safe GET for allowed and disallowed projects/documents.
+- [x] Test payload validation and normalization: whitespace-only activity and
+      invalid enums are rejected; client-supplied sequence gaps/duplicates are
+      stored as contiguous `1..N` in submitted array order.
+- [ ] Test initial Field ITP upload returns `DRAFT` and creates no review; test
+      explicit submission creates the review and starts the normal workflow.
+- [ ] Regression-test Procedure and Work Method upload behavior.
+- [ ] Test revision copy-forward preserves all item fields and leaves the copied
+      rows editable only on the new draft.
+- [ ] Add frontend tests for Vendor editable draft, Vendor submitted read-only,
+      Reviewer/Checker read-only, non-ITP hidden state, dirty-state warning,
+      success guidance, and cache refresh after save/submit.
+
+### 6. Manual workflow verification
+
+- [ ] As Vendor, upload a new Field ITP and verify the draft-created guidance
+      and direct editor action.
+- [ ] Add, modify, reorder, remove, and save Inspection Items; reload and verify
+      persistence.
+- [ ] Submit the draft and verify the rows lock immediately and the review queue
+      receives the document.
+- [ ] As Reviewer and Checker, verify the identical rows are visible but no
+      editing or save controls exist.
+- [ ] As a different Vendor institution, verify the Inspection Items cannot be
+      read or changed by direct item URL/API request. Broader document endpoint
+      scoping remains outside this work.
+- [ ] Complete a Status C cycle, create a revision, verify rows are copied into
+      the new draft, edit them, and verify the rejected revision is unchanged.
+
+## Success criteria
+
+- [ ] Vendor is the only role capable of mutating Field ITP Inspection Items in
+      both UI and API; Reviewer/Checker write attempts consistently return
+      `403`.
+- [ ] A new Field ITP upload remains a visible, editable `DRAFT` until the Vendor
+      explicitly submits it.
+- [ ] The Vendor is told exactly what to do next at creation time and whenever
+      the draft is reopened; successful creation automatically opens the exact
+      new draft at the editor.
+- [ ] Submission locks Inspection Items, creates a review, transitions the
+      document from `DRAFT` to `SUBMITTED`, and does not lose any saved rows.
+- [ ] Vendor-institution ownership and project visibility are enforced for both
+      Inspection Item reads and writes; direct item access outside scope is
+      denied. Broader document REST scoping remains separate and documented.
+- [ ] Revision copy-forward works without altering historical rows.
+- [ ] Focused backend/frontend tests, production builds, and the manual
+      Vendor→Reviewer workflow all pass with recorded evidence.
+- [ ] No unrelated role, document section, Comment Sheet, or SLA behavior
+      regresses.
+
+## Work log / review
+
+- 2026-08-30 — Planning only: traced the current frontend, route, service,
+  lifecycle, and test behavior; confirmed the partial migration and recorded
+  the implementation/verification plan. No application code changed.
+- 2026-08-30 — Plan review: defined immutable Vendor-institution ownership,
+  narrowed read-hardening to the Inspection Item endpoint, made row validation
+  measurable, accepted existing last-write-wins collaboration semantics, and
+  specified the upload response callback that automatically opens the new
+  draft. No application code changed.
+- 2026-08-30 — Implementation: backend and frontend changes are in place;
+  `prisma validate`, backend build, focused backend tests (10/10), frontend
+  build, and frontend tests (24/24) passed. Full backend suite reached 121
+  passing tests plus 10 skipped integration tests but the suite could not
+  complete because PostgreSQL was unavailable at `localhost:5432`.
+- 2026-08-30 — Final review: moved the ITP API/controller logic into the
+  document domain, kept Reviewer/Checker rendering read-only, added the
+  submitted-state lock confirmation, and corrected non-ITP upload messaging.
+  `git diff --check` passed. Manual browser verification and DB-backed
+  integration tests remain pending until PostgreSQL is available.
+- 2026-08-30 — Additional verification: backend non-DB suite passed 121/121
+  when the PostgreSQL integration file was excluded; frontend build/tests and
+  backend build were rerun successfully after the final UI adjustments.
+- [ ] During implementation, record each completed phase, commands/tests run,
+      observed results, remaining risks, and any approved scope changes here.

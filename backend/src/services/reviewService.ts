@@ -1,6 +1,6 @@
 import { prisma } from '../config/database';
 import { AppError } from '../utils/AppError';
-import { ReviewStatus, DocumentSection, Role, ReviewMarkupStage, type ItpCategory, type InspectionLevel, type ItpPhase } from '@prisma/client';
+import { ReviewStatus, DocumentSection, Role, ReviewMarkupStage } from '@prisma/client';
 import { calculateSlaDeadline, isOverdue, getCurrentStage } from './slaService';
 import { generateCommentSheet } from '../utils/pdfEngine/commentSheetGenerator';
 import { config } from '../config';
@@ -23,8 +23,12 @@ export async function submitForReview(documentId: string, actorId: string) {
     throw new AppError('Document not found', 404);
   }
 
-  if (document.uploaded_by !== actorId) {
-    throw new AppError('Only the document uploader can submit it for review', 403);
+  const actor = await prisma.user.findUnique({
+    where: { id: actorId },
+    select: { institution_id: true },
+  });
+  if (!actor || actor.institution_id !== document.vendor_institution_id) {
+    throw new AppError('Only a member of the document Vendor institution can submit it for review', 403);
   }
 
   const allowedStatuses: ReviewStatus[] = [
@@ -1582,100 +1586,4 @@ export async function getNotifications(
   });
 
   return notifications;
-}
-
-// ── getItpItems ─────────────────────────────────────────────────────────────
-
-export async function getItpItems(documentId: string) {
-  const document = await prisma.document.findUnique({ where: { id: documentId } });
-  if (!document) throw new AppError('Document not found', 404);
-
-  return prisma.itpItem.findMany({
-    where: { document_id: documentId },
-    orderBy: { seq_no: 'asc' },
-  });
-}
-
-// ── saveItpItems ────────────────────────────────────────────────────────────
-
-export async function saveItpItems(
-  documentId: string,
-  actorId: string,
-  actorRole: Role,
-  items: Array<{
-    seq_no: number;
-    activity: string;
-    acceptance_criteria?: string;
-    reference_standard?: string;
-    verifying_document?: string;
-    sub_code?: InspectionLevel;
-    pp_code?: InspectionLevel;
-    pln_code?: InspectionLevel;
-    phase?: ItpPhase;
-    category: ItpCategory;
-  }>,
-) {
-  const document = await prisma.document.findUnique({
-    where: { id: documentId },
-    include: { reviews: { where: { final_status: { not: null } }, take: 1 } },
-  });
-  if (!document) throw new AppError('Document not found', 404);
-
-  if (document.reviews.length > 0) {
-    throw new AppError(
-      'ITP items are locked — the document review has received a final status.',
-      403,
-    );
-  }
-
-  const allowedRoles: Role[] = [Role.VENDOR, Role.REVIEWER, Role.CHECKER];
-  if (!allowedRoles.includes(actorRole)) {
-    throw new AppError('Only Vendor, Reviewer, or Checker can edit ITP items', 403);
-  }
-
-  if (actorRole === Role.VENDOR) {
-    if (document.uploaded_by !== actorId) {
-      throw new AppError('Only the document uploader can edit draft ITP items', 403);
-    }
-    if (document.status !== ReviewStatus.DRAFT) {
-      throw new AppError('Vendor ITP editing is only available while the document is a draft', 403);
-    }
-  }
-
-  const activeReview = await prisma.documentReview.findFirst({
-    where: { document_id: documentId, final_status: null },
-  });
-
-  if (actorRole === Role.REVIEWER && activeReview?.reviewer_id && activeReview.reviewer_id !== actorId) {
-    throw new AppError('You are not the assigned reviewer for this document', 403);
-  }
-  if (actorRole === Role.CHECKER && activeReview?.checker_id && activeReview.checker_id !== actorId) {
-    throw new AppError('You are not the assigned checker for this document', 403);
-  }
-
-  await prisma.$transaction(async (tx) => {
-    await tx.itpItem.deleteMany({ where: { document_id: documentId } });
-    if (items.length > 0) {
-      await tx.itpItem.createMany({
-        data: items.map((item) => ({
-          document_id: documentId,
-          seq_no: item.seq_no,
-          activity: item.activity,
-          acceptance_criteria: item.acceptance_criteria ?? null,
-          reference_standard: item.reference_standard ?? null,
-          verifying_document: item.verifying_document ?? null,
-          sub_code: item.sub_code ?? null,
-          pp_code: item.pp_code ?? null,
-          pln_code: item.pln_code ?? null,
-          phase: item.phase ?? 'FIELD',
-          category: item.category,
-        })),
-      });
-    }
-  });
-
-  return prisma.itpItem.findMany({
-    where: { document_id: documentId },
-    orderBy: { seq_no: 'asc' },
-  });
 }

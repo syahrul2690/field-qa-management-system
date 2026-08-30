@@ -132,6 +132,7 @@ beforeAll(async () => {
       doc_number: FIXTURE_DOC_NUMBER,
       title: 'Scope Test Document',
       uploaded_by: FIXTURE_USER,
+      vendor_institution_id: OUTSIDER_INSTITUTION,
     },
   });
 

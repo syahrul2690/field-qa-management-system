@@ -10,6 +10,7 @@ interface DocumentUploadFormProps {
   onClose: () => void;
   boqItemId: string;
   section: string;
+  onCreated?: (document: { id: string; doc_number?: string; title?: string; section?: string }) => void;
 }
 
 const SECTION_LABEL: Record<string, string> = {
@@ -18,7 +19,7 @@ const SECTION_LABEL: Record<string, string> = {
   WORK_METHOD: 'Work Method',
 };
 
-export function DocumentUploadForm({ isOpen, onClose, boqItemId, section }: DocumentUploadFormProps) {
+export function DocumentUploadForm({ isOpen, onClose, boqItemId, section, onCreated }: DocumentUploadFormProps) {
   const { addToast } = useUIStore();
   const queryClient = useQueryClient();
 
@@ -30,9 +31,13 @@ export function DocumentUploadForm({ isOpen, onClose, boqItemId, section }: Docu
 
   const uploadMutation = useMutation({
     mutationFn: (fd: FormData) => documentApi.upload(fd),
-    onSuccess: () => {
-      addToast('success', 'Document uploaded and submitted for review.');
+    onSuccess: (response) => {
+      const created = response?.data?.data;
+      addToast('success', section === 'FIELD_ITP'
+        ? 'Field ITP draft created. Next, add and save Inspection Items, then submit it for review.'
+        : 'Document uploaded and submitted for review.');
       queryClient.invalidateQueries({ queryKey: ['documents', boqItemId, section] });
+      if (created?.id) onCreated?.(created);
       handleClose();
     },
     onError: (err: unknown) => {

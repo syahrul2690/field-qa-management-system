@@ -156,6 +156,7 @@ model Institution {
   users User[]
 
   project_vendor_visibility ProjectVendorVisibility[]
+  documents_as_vendor       Document[] @relation("DocumentVendorInstitution")
 
   created_at DateTime @default(now())
   updated_at DateTime @updatedAt
@@ -390,10 +391,15 @@ model Document {
   revision_no        Int             @default(0)
   status             ReviewStatus    @default(DRAFT)
   is_current         Boolean         @default(true)
+  // Immutable tenant snapshot captured at upload time. This must not be
+  // derived from the current project vendor assignments: revisions and old
+  // review history remain owned by the original vendor institution.
+  vendor_institution_id String
 
   boq_item    BoqItem @relation(fields: [boq_item_id], references: [id], onDelete: Cascade)
   uploaded_by String
   uploader    User    @relation("DocumentUploader", fields: [uploaded_by], references: [id])
+  vendor_institution Institution @relation("DocumentVendorInstitution", fields: [vendor_institution_id], references: [id], onDelete: Restrict)
 
   files          DocumentFile[]
   reviews        DocumentReview[]
@@ -405,6 +411,7 @@ model Document {
 
   @@unique([boq_item_id, section, doc_number, revision_no])
   @@index([boq_item_id, section, is_current])
+  @@index([vendor_institution_id])
   @@index([status])
 }
 

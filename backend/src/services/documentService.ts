@@ -1,8 +1,16 @@
 import { prisma } from '../config/database';
 import { AppError } from '../utils/AppError';
-import { DocumentSection, ReviewStatus } from '@prisma/client';
+import {
+  DocumentSection,
+  InstitutionType,
+  ReviewStatus,
+  Role,
+  ItpCategory,
+  InspectionLevel,
+  ItpPhase,
+} from '@prisma/client';
 import { storeDocumentFile } from './fileStorageService';
-import { submitForReview } from './reviewService';
+import { buildDocumentScopeWhere, type ScopeUser } from './accessScopeService';
 
 // ─── Input Interfaces ─────────────────────────────────────────────────────────
 
@@ -22,6 +30,134 @@ interface CreateRevisionInput {
   title: string;
   surat_pengantar_no?: string;
   uploaded_by: string;
+}
+
+type NormalizedItpItem = {
+  seq_no: number;
+  activity: string;
+  acceptance_criteria?: string;
+  reference_standard?: string;
+  verifying_document?: string;
+  sub_code?: InspectionLevel;
+  pp_code?: InspectionLevel;
+  pln_code?: InspectionLevel;
+  phase?: ItpPhase;
+  category: ItpCategory;
+};
+
+function normalizeItpItems(value: unknown): NormalizedItpItem[] {
+  if (!Array.isArray(value)) throw new AppError('items must be an array', 400);
+  const levels = new Set(Object.values(InspectionLevel));
+  const phases = new Set(Object.values(ItpPhase));
+  const categories = new Set(Object.values(ItpCategory));
+
+  return value.map((raw, index) => {
+    if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+      throw new AppError(`items[${index}] must be an object`, 400);
+    }
+    const item = raw as Record<string, unknown>;
+    if (typeof item.activity !== 'string' || item.activity.trim().length === 0) {
+      throw new AppError(`items[${index}].activity is required`, 400);
+    }
+    if (typeof item.category !== 'string' || !categories.has(item.category as ItpCategory)) {
+      throw new AppError(`items[${index}].category is invalid`, 400);
+    }
+    for (const field of ['sub_code', 'pp_code', 'pln_code'] as const) {
+      if (item[field] !== undefined && item[field] !== null && !levels.has(item[field] as InspectionLevel)) {
+        throw new AppError(`items[${index}].${field} is invalid`, 400);
+      }
+    }
+    if (item.phase !== undefined && item.phase !== null && !phases.has(item.phase as ItpPhase)) {
+      throw new AppError(`items[${index}].phase is invalid`, 400);
+    }
+    const optionalText = (field: string) => {
+      const v = item[field];
+      if (v === undefined || v === null || v === '') return undefined;
+      if (typeof v !== 'string') throw new AppError(`items[${index}].${field} must be a string`, 400);
+      return v;
+    };
+    return {
+      seq_no: index + 1,
+      activity: item.activity.trim(),
+      acceptance_criteria: optionalText('acceptance_criteria'),
+      reference_standard: optionalText('reference_standard'),
+      verifying_document: optionalText('verifying_document'),
+      sub_code: (item.sub_code ?? undefined) as InspectionLevel | undefined,
+      pp_code: (item.pp_code ?? undefined) as InspectionLevel | undefined,
+      pln_code: (item.pln_code ?? undefined) as InspectionLevel | undefined,
+      phase: (item.phase ?? undefined) as ItpPhase | undefined,
+      category: item.category as ItpCategory,
+    };
+  });
+}
+
+export async function getItpItems(documentId: string, actor?: ScopeUser) {
+  const document = actor
+    ? await prisma.document.findFirst({
+      where: { AND: [{ id: documentId }, buildDocumentScopeWhere(actor)] },
+    })
+    : await prisma.document.findUnique({ where: { id: documentId } });
+  if (!document) throw new AppError('Document not found', 404);
+
+  return prisma.itpItem.findMany({
+    where: { document_id: documentId },
+    orderBy: { seq_no: 'asc' },
+  });
+}
+
+export async function saveItpItems(
+  documentId: string,
+  actorId: string,
+  actorRole: Role,
+  items: unknown,
+  actorInstitutionId?: string,
+) {
+  const document = await prisma.document.findUnique({
+    where: { id: documentId },
+    include: { reviews: { where: { final_status: { not: null } }, take: 1 } },
+  });
+  if (!document) throw new AppError('Document not found', 404);
+
+  if (actorRole !== Role.VENDOR) throw new AppError('Only Vendor can edit ITP items', 403);
+  if (document.section !== DocumentSection.FIELD_ITP) {
+    throw new AppError('Inspection Items can only be edited for FIELD_ITP documents', 400);
+  }
+  if (!document.is_current || document.status !== ReviewStatus.DRAFT) {
+    throw new AppError('Vendor ITP editing is only available on the current document draft', 403);
+  }
+  if (document.reviews.length > 0) {
+    throw new AppError('ITP items are locked — the document review has received a final status.', 403);
+  }
+  if (!actorInstitutionId || actorInstitutionId !== document.vendor_institution_id) {
+    throw new AppError('You can only edit ITP items owned by your Vendor institution', 403);
+  }
+
+  const normalizedItems = normalizeItpItems(items);
+  await prisma.$transaction(async (tx) => {
+    await tx.itpItem.deleteMany({ where: { document_id: documentId } });
+    if (normalizedItems.length > 0) {
+      await tx.itpItem.createMany({
+        data: normalizedItems.map((item) => ({
+          document_id: documentId,
+          seq_no: item.seq_no,
+          activity: item.activity,
+          acceptance_criteria: item.acceptance_criteria ?? null,
+          reference_standard: item.reference_standard ?? null,
+          verifying_document: item.verifying_document ?? null,
+          sub_code: item.sub_code ?? null,
+          pp_code: item.pp_code ?? null,
+          pln_code: item.pln_code ?? null,
+          phase: item.phase ?? 'FIELD',
+          category: item.category,
+        })),
+      });
+    }
+  });
+
+  return prisma.itpItem.findMany({
+    where: { document_id: documentId },
+    orderBy: { seq_no: 'asc' },
+  });
 }
 
 async function resolveCoverageIds(primaryId: string, requestedIds?: string[]): Promise<string[]> {
@@ -79,6 +215,18 @@ export async function createDocument(
   const { boq_item_id, section, doc_number, title, surat_pengantar_no, uploaded_by } = input;
   const coverageIds = await resolveCoverageIds(boq_item_id, input.boq_item_ids);
 
+  // Snapshot the uploader's institution on the document. Authorization for
+  // later draft edits must use this immutable tenant value, not the current
+  // project vendor assignment or the identity of the original uploader.
+  const uploader = await prisma.user.findUnique({
+    where: { id: uploaded_by },
+    select: { institution_id: true, institution: { select: { type: true } } },
+  });
+  if (!uploader) throw new AppError('Uploader not found', 404);
+  if (uploader.institution.type !== InstitutionType.VENDOR) {
+    throw new AppError('Documents can only be uploaded by a Vendor institution', 403);
+  }
+
   // 1. Verify BoQ item exists and retrieve project_id
   const boqItem = await prisma.boqItem.findUnique({
     where: { id: boq_item_id },
@@ -116,6 +264,7 @@ export async function createDocument(
         revision_no: 0,
         status: ReviewStatus.DRAFT,
         is_current: true,
+        vendor_institution_id: uploader.institution_id,
       },
     });
 
@@ -143,9 +292,12 @@ export async function createDocument(
     });
   });
 
-  // Immediately submit the freshly uploaded document for review, so it never
-  // sits invisible to reviewers in a DRAFT state the vendor forgot to submit.
-  await submitForReview(document!.id, uploaded_by);
+  // Field ITPs need a vendor preparation phase for Inspection Items. The
+  // existing Procedure/Work Method workflow remains immediately submitted.
+  if (section !== DocumentSection.FIELD_ITP) {
+    const { submitForReview } = await import('./reviewService');
+    await submitForReview(document!.id, uploaded_by);
+  }
 
   return prisma.document.findUnique({
     where: { id: document!.id },
@@ -170,6 +322,17 @@ export async function createRevision(
 
   if (!oldDoc) {
     throw new AppError('Document not found', 404);
+  }
+
+  const actor = await prisma.user.findUnique({
+    where: { id: uploaded_by },
+    select: { institution_id: true, institution: { select: { type: true } } },
+  });
+  if (!actor || actor.institution.type !== InstitutionType.VENDOR) {
+    throw new AppError('Only a Vendor institution can create document revisions', 403);
+  }
+  if (actor.institution_id !== oldDoc.vendor_institution_id) {
+    throw new AppError('You can only revise documents owned by your Vendor institution', 403);
   }
 
   // 2. Must be the current version
@@ -213,6 +376,7 @@ export async function createRevision(
         revision_no: newRevisionNo,
         status: ReviewStatus.DRAFT,
         is_current: true,
+        vendor_institution_id: oldDoc.vendor_institution_id,
       },
     });
 

@@ -7,6 +7,7 @@ import { StatusBadge } from '../../components/ui/StatusBadge';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { useAuthStore } from '../../store/authStore';
 import { useUIStore } from '../../store/uiStore';
+import { ItpItemPanel } from './ItpItemPanel';
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -163,7 +164,17 @@ function ReviewHistorySection({ reviewId }: { reviewId: string }) {
   );
 }
 
-function DocumentVersionCard({ doc, isLatest }: { doc: any; isLatest: boolean }) {
+function DocumentVersionCard({
+  doc,
+  isLatest,
+  itpDirty = false,
+  onItpDirtyChange,
+}: {
+  doc: any;
+  isLatest: boolean;
+  itpDirty?: boolean;
+  onItpDirtyChange?: (dirty: boolean) => void;
+}) {
   const [open, setOpen] = useState(isLatest);
   const { user } = useAuthStore();
   const { addToast } = useUIStore();
@@ -230,17 +241,36 @@ function DocumentVersionCard({ doc, isLatest }: { doc: any; isLatest: boolean })
             <div className="flex items-center justify-between gap-3 rounded-md border border-blue-200 bg-blue-50 px-3 py-2">
               <div>
                 <p className="text-xs font-semibold text-blue-800">Draft is ready</p>
-                <p className="text-xs text-blue-600 mt-0.5">Submit when the files and ITP rows are complete.</p>
+                <p className="text-xs text-blue-600 mt-0.5">Next: review files → add Inspection Items → save items → submit for review.</p>
               </div>
               <button
                 type="button"
-                onClick={() => submitMutation.mutate()}
+                onClick={() => {
+                  if (itpDirty) {
+                    addToast('error', 'Save the Inspection Items before submitting this draft.');
+                    return;
+                  }
+                  submitMutation.mutate();
+                }}
                 disabled={submitMutation.isPending}
                 className="btn-primary py-1.5 px-3 text-xs"
               >
                 {submitMutation.isPending ? 'Submitting…' : 'Submit for Review'}
               </button>
             </div>
+          )}
+
+          {doc.section === 'FIELD_ITP' && (
+            <ItpItemPanel
+              documentId={doc.id}
+              canEdit={isLatest && user?.role === 'VENDOR' && doc.status === 'DRAFT'}
+              onDirtyChange={isLatest && user?.role === 'VENDOR' && doc.status === 'DRAFT' ? onItpDirtyChange : undefined}
+            />
+          )}
+          {isLatest && doc.section === 'FIELD_ITP' && doc.status !== 'DRAFT' && (
+            <p className="rounded-md border border-green-200 bg-green-50 px-3 py-2 text-xs text-green-700">
+              Submitted for review. Inspection Items are now locked.
+            </p>
           )}
         </div>
       )}
@@ -266,6 +296,12 @@ export function DocumentDetailModal({
   docNumber,
   onClose,
 }: DocumentDetailModalProps) {
+  const [itpDirty, setItpDirty] = useState(false);
+
+  const requestClose = () => {
+    if (itpDirty && !window.confirm('You have unsaved Inspection Items. Close without saving?')) return;
+    onClose();
+  };
   // Load revision history
   const { data: historyData, isLoading: histLoading } = useQuery({
     queryKey: ['doc-history', boqItemId, section, docNumber],
@@ -283,7 +319,7 @@ export function DocumentDetailModal({
   return (
     <>
       {/* Backdrop */}
-      <div className="fixed inset-0 z-40 bg-black bg-opacity-40" onClick={onClose} />
+      <div className="fixed inset-0 z-40 bg-black bg-opacity-40" onClick={requestClose} />
 
       {/* Modal panel */}
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -304,7 +340,7 @@ export function DocumentDetailModal({
               </h2>
             </div>
             <button
-              onClick={onClose}
+              onClick={requestClose}
               className="flex-shrink-0 text-gray-400 hover:text-gray-600 p-1.5 rounded-md hover:bg-gray-200 transition-colors"
             >
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -337,6 +373,8 @@ export function DocumentDetailModal({
                     key={doc.id}
                     doc={doc}
                     isLatest={idx === 0}
+                    itpDirty={itpDirty}
+                    onItpDirtyChange={setItpDirty}
                   />
                 ))}
               </div>
