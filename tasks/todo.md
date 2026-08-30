@@ -831,3 +831,62 @@ workflow, or approval semantics.
   Existing Vite chunk/import warnings remain non-blocking. PostgreSQL-backed
   integration tests and manual browser verification were not run in this
   change; no push or VPS deployment was performed.
+
+## 2026-08-30 — BoQ tree-row document indicators (completed)
+
+### Objective
+
+Make document presence visible directly beside every BoQ tree item, including
+items such as Steel Fabrication, before the user opens the detail panel.
+
+### Scope and decisions
+
+- Extend the authenticated BoQ tree response with current-document counts per
+  `FIELD_ITP`, `PROCEDURE`, and `WORK_METHOD` section so the tree makes one
+  project request rather than issuing one document request per row.
+- Count only `Document.is_current === true`; historical/superseded revisions
+  do not populate a row indicator.
+- Keep indicators limited to presence/current counts. They do not imply review,
+  approval, or QC readiness.
+- Preserve existing project/document authorization and the detail-panel query;
+  show loading/error states for the tree summary without hiding the BoQ tree.
+
+### Implementation plan
+
+- [x] Trace and specify the backend tree response, document coverage joins,
+      frontend row rendering, and existing tests.
+- [x] Add a scoped current-document summary to the BoQ tree response,
+      including linked multi-BoQ coverage where applicable.
+- [x] Render compact, obvious per-section badges on every tree row with honest
+      loading/error/empty states.
+- [x] Add focused backend/frontend tests for current, historical-only, empty,
+      loading, error, and multi-section rows.
+- [x] Run relevant tests/builds, update evidence, and preserve unrelated dirty
+      files. No push/deployment until explicitly authorized.
+
+### Success criteria
+
+- [x] Every visible BoQ item clearly shows Field ITP, Procedure, and Work Method
+      as current counts or empty/unavailable states.
+- [x] Steel Fabrication (and any item with a current document) is visibly
+      distinguishable in the tree without opening the detail panel.
+- [x] Historical/superseded-only documents never count as current presence.
+- [x] Tree loading/error states remain honest and existing workflows/auth remain
+      unchanged.
+
+### Work log / review
+
+- 2026-08-30 — Screenshot follow-up trace: the previous indicator existed only
+  in `BoqItemDetailPanel`; `BoqTreePage` had no document fields to render, which
+  explains why Steel Fabrication showed no status in the tree. No code changed
+  during tracing.
+- 2026-08-30 — Implemented project-scoped current-document counts in the BoQ
+  tree response, including linked multi-BoQ coverage. Added row badges for ITP,
+  Procedure, and Work Method, with explicit Docs…/Docs ? fallback states, and
+  invalidated the BoQ tree cache after upload/revision.
+- 2026-08-30 — Verification: focused frontend tests passed 6/6; focused
+  backend document-count tests passed 2/2; full frontend suite passed 30/30
+  across 8 files; backend non-DB suite passed 123/123 across 16 files;
+  frontend and backend builds passed. Existing Vite import/chunk warnings are
+  non-blocking. PostgreSQL-backed integration and manual browser verification
+  remain pending; no push or deployment was performed.

@@ -6,6 +6,7 @@ import { useAuthStore } from '../../store/authStore';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
 import { BoqUploadModal } from './BoqUploadModal';
 import { BoqItemDetailPanel } from './BoqItemDetailPanel';
+import { BoqDocumentBadges, BoqDocumentCounts } from './BoqDocumentBadges';
 
 interface BoqItem {
   id: string;
@@ -14,6 +15,7 @@ interface BoqItem {
   title: string;
   level: number;
   children?: BoqItem[];
+  document_counts?: BoqDocumentCounts;
 }
 
 interface BoqNodeProps {
@@ -83,6 +85,8 @@ function BoqNode({ item, depth, onSelect, selectedId }: BoqNodeProps) {
         <span className={`flex-1 truncate ${isSelected ? 'text-primary-700' : ''} ${lvl.title}`}>
           {item.title}
         </span>
+
+        <BoqDocumentBadges counts={item.document_counts} />
       </div>
 
       {expanded && hasChildren && (

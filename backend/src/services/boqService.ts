@@ -6,6 +6,7 @@ import {
   topologicalSort,
   generateSystemTag,
   buildBoqTree,
+  attachDocumentCounts,
   BoqItemNode,
   BoqTreeNode,
 } from './boqTreeService';
@@ -80,7 +81,25 @@ export async function getBoqTree(projectId: string): Promise<BoqTreeNode[]> {
     where: { project_id: projectId },
     orderBy: [{ level: 'asc' }, { sort_order: 'asc' }],
   });
-  return buildBoqTree(items as BoqItemNode[]);
+  const itemIds = items.map((item) => item.id);
+  const documents = itemIds.length === 0
+    ? []
+    : await prisma.document.findMany({
+      where: {
+        is_current: true,
+        OR: [
+          { boq_item_id: { in: itemIds } },
+          { boq_item_links: { some: { boq_item_id: { in: itemIds } } } },
+        ],
+      },
+      select: {
+        boq_item_id: true,
+        section: true,
+        is_current: true,
+        boq_item_links: { select: { boq_item_id: true } },
+      },
+    });
+  return buildBoqTree(attachDocumentCounts(items as BoqItemNode[], documents));
 }
 
 // ─── Get direct children of a BoQ item (lazy loading) ────────────────────────
