@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { Role } from '@prisma/client';
+import { DocumentSection, ReviewStatus, Role } from '@prisma/client';
 import { AppError } from '../utils/AppError';
 
 const mockPrisma = vi.hoisted(() => {
@@ -32,12 +32,19 @@ vi.mock('../utils/pdfEngine/commentSheetGenerator', () => ({
   generateCommentSheet: vi.fn(),
 }));
 
-import { getItpItems, saveItpItems } from '../services/reviewService';
+import { getItpItems, saveItpItems } from '../services/documentService';
 
 const SAMPLE_ITEM = {
   seq_no: 1,
   activity: 'Check foundation levelness',
   category: 'SIPIL' as const,
+};
+const DRAFT_DOCUMENT = {
+  id: 'doc-1',
+  section: DocumentSection.FIELD_ITP,
+  status: ReviewStatus.DRAFT,
+  is_current: true,
+  vendor_institution_id: 'vendor-1',
 };
 
 describe('reviewService — ITP items', () => {
@@ -82,65 +89,38 @@ describe('reviewService — ITP items', () => {
 
     it('throws 403 when the document review already has a final status (locked)', async () => {
       mockPrisma.document.findUnique.mockResolvedValue({
-        id: 'doc-1',
+        ...DRAFT_DOCUMENT,
         reviews: [{ id: 'rev-1', final_status: 'APPROVED_A' }],
       });
 
       await expect(
-        saveItpItems('doc-1', 'user-1', Role.REVIEWER, [SAMPLE_ITEM]),
+        saveItpItems('doc-1', 'user-1', Role.VENDOR, [SAMPLE_ITEM], 'vendor-1'),
       ).rejects.toThrow('ITP items are locked');
 
       expect(mockPrisma.itpItem.deleteMany).not.toHaveBeenCalled();
     });
 
-    it('throws 403 for a role other than VENDOR, REVIEWER, or CHECKER', async () => {
-      mockPrisma.document.findUnique.mockResolvedValue({ id: 'doc-1', reviews: [] });
+    it('throws 403 for a role other than VENDOR', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({ ...DRAFT_DOCUMENT, reviews: [] });
 
       await expect(
         saveItpItems('doc-1', 'user-1', Role.APPROVER, [SAMPLE_ITEM]),
-      ).rejects.toThrow('Only Vendor, Reviewer, or Checker can edit ITP items');
+      ).rejects.toThrow('Only Vendor can edit ITP items');
     });
 
-    it('throws 403 when the REVIEWER is not the assigned reviewer', async () => {
-      mockPrisma.document.findUnique.mockResolvedValue({ id: 'doc-1', reviews: [] });
-      mockPrisma.documentReview.findFirst.mockResolvedValue({
-        id: 'rev-1',
-        reviewer_id: 'someone-else',
-        checker_id: null,
-        final_status: null,
-      });
-
+    it('throws 403 when a different Vendor institution attempts to edit', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({ ...DRAFT_DOCUMENT, reviews: [] });
       await expect(
-        saveItpItems('doc-1', 'user-1', Role.REVIEWER, [SAMPLE_ITEM]),
-      ).rejects.toThrow('You are not the assigned reviewer for this document');
+        saveItpItems('doc-1', 'user-1', Role.VENDOR, [SAMPLE_ITEM], 'vendor-2'),
+      ).rejects.toThrow('owned by your Vendor institution');
     });
 
-    it('throws 403 when the CHECKER is not the assigned checker', async () => {
-      mockPrisma.document.findUnique.mockResolvedValue({ id: 'doc-1', reviews: [] });
-      mockPrisma.documentReview.findFirst.mockResolvedValue({
-        id: 'rev-1',
-        reviewer_id: null,
-        checker_id: 'someone-else',
-        final_status: null,
-      });
-
-      await expect(
-        saveItpItems('doc-1', 'user-1', Role.CHECKER, [SAMPLE_ITEM]),
-      ).rejects.toThrow('You are not the assigned checker for this document');
-    });
-
-    it('allows the assigned REVIEWER to save items', async () => {
-      mockPrisma.document.findUnique.mockResolvedValue({ id: 'doc-1', reviews: [] });
-      mockPrisma.documentReview.findFirst.mockResolvedValue({
-        id: 'rev-1',
-        reviewer_id: 'user-1',
-        checker_id: null,
-        final_status: null,
-      });
+    it('allows the owning Vendor to save items and normalizes sequence numbers', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({ ...DRAFT_DOCUMENT, reviews: [] });
       const saved = [{ id: 'i1', ...SAMPLE_ITEM }];
       mockPrisma.itpItem.findMany.mockResolvedValue(saved);
 
-      const result = await saveItpItems('doc-1', 'user-1', Role.REVIEWER, [SAMPLE_ITEM]);
+      const result = await saveItpItems('doc-1', 'user-1', Role.VENDOR, [{ ...SAMPLE_ITEM, seq_no: 99 }], 'vendor-1');
 
       expect(mockPrisma.itpItem.deleteMany).toHaveBeenCalledWith({
         where: { document_id: 'doc-1' },
@@ -163,18 +143,12 @@ describe('reviewService — ITP items', () => {
     });
 
     it('persists a per-party responsibility matrix (sub/pp/pln each get their own code)', async () => {
-      mockPrisma.document.findUnique.mockResolvedValue({ id: 'doc-1', reviews: [] });
-      mockPrisma.documentReview.findFirst.mockResolvedValue({
-        id: 'rev-1',
-        reviewer_id: 'user-1',
-        checker_id: null,
-        final_status: null,
-      });
+      mockPrisma.document.findUnique.mockResolvedValue({ ...DRAFT_DOCUMENT, reviews: [] });
       mockPrisma.itpItem.findMany.mockResolvedValue([]);
 
-      await saveItpItems('doc-1', 'user-1', Role.REVIEWER, [
+      await saveItpItems('doc-1', 'user-1', Role.VENDOR, [
         { ...SAMPLE_ITEM, sub_code: 'P', pp_code: 'R', pln_code: 'H' },
-      ]);
+      ], 'vendor-1');
 
       expect(mockPrisma.itpItem.createMany).toHaveBeenCalledWith({
         data: [
@@ -187,48 +161,21 @@ describe('reviewService — ITP items', () => {
       });
     });
 
-    it('allows a REVIEWER to save when no reviewer has been assigned yet', async () => {
-      mockPrisma.document.findUnique.mockResolvedValue({ id: 'doc-1', reviews: [] });
-      mockPrisma.documentReview.findFirst.mockResolvedValue({
-        id: 'rev-1',
-        reviewer_id: null,
-        checker_id: null,
-        final_status: null,
-      });
+    it('rejects malformed item payloads before changing rows', async () => {
+      mockPrisma.document.findUnique.mockResolvedValue({ ...DRAFT_DOCUMENT, reviews: [] });
       mockPrisma.itpItem.findMany.mockResolvedValue([]);
 
       await expect(
-        saveItpItems('doc-1', 'user-1', Role.REVIEWER, [SAMPLE_ITEM]),
-      ).resolves.toEqual([]);
-      expect(mockPrisma.itpItem.createMany).toHaveBeenCalled();
-    });
-
-    it('allows the assigned CHECKER to save items', async () => {
-      mockPrisma.document.findUnique.mockResolvedValue({ id: 'doc-1', reviews: [] });
-      mockPrisma.documentReview.findFirst.mockResolvedValue({
-        id: 'rev-1',
-        reviewer_id: null,
-        checker_id: 'user-2',
-        final_status: null,
-      });
-      mockPrisma.itpItem.findMany.mockResolvedValue([]);
-
-      await expect(
-        saveItpItems('doc-1', 'user-2', Role.CHECKER, [SAMPLE_ITEM]),
-      ).resolves.toEqual([]);
+        saveItpItems('doc-1', 'user-1', Role.VENDOR, [{ ...SAMPLE_ITEM, category: 'bad' }], 'vendor-1'),
+      ).rejects.toThrow('category is invalid');
+      expect(mockPrisma.itpItem.deleteMany).not.toHaveBeenCalled();
     });
 
     it('deletes all items and skips createMany when given an empty list', async () => {
-      mockPrisma.document.findUnique.mockResolvedValue({ id: 'doc-1', reviews: [] });
-      mockPrisma.documentReview.findFirst.mockResolvedValue({
-        id: 'rev-1',
-        reviewer_id: 'user-1',
-        checker_id: null,
-        final_status: null,
-      });
+      mockPrisma.document.findUnique.mockResolvedValue({ ...DRAFT_DOCUMENT, reviews: [] });
       mockPrisma.itpItem.findMany.mockResolvedValue([]);
 
-      await saveItpItems('doc-1', 'user-1', Role.REVIEWER, []);
+      await saveItpItems('doc-1', 'user-1', Role.VENDOR, [], 'vendor-1');
 
       expect(mockPrisma.itpItem.deleteMany).toHaveBeenCalled();
       expect(mockPrisma.itpItem.createMany).not.toHaveBeenCalled();

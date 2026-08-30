@@ -225,6 +225,14 @@ export function BoqItemDetailPanel({ item, onClose }: BoqItemDetailPanelProps) {
         onClose={() => setUploadOpen(false)}
         boqItemId={item.id}
         section={activeSection}
+        onCreated={(created) => {
+          setSelectedDoc({
+            documentId: created.id,
+            boqItemId: item.id,
+            section: created.section ?? activeSection,
+            docNumber: created.doc_number ?? '',
+          });
+        }}
       />
 
       {/* Document detail modal */}
@@ -253,4 +261,3 @@ export function BoqItemDetailPanel({ item, onClose }: BoqItemDetailPanelProps) {
     </>
   );
 }
-

@@ -1,7 +1,7 @@
 import { Request, Response } from 'express';
 import { asyncHandler } from '../utils/asyncHandler';
 import { AppError } from '../utils/AppError';
-import { DocumentSection } from '@prisma/client';
+import { DocumentSection, Role } from '@prisma/client';
 import * as documentService from '../services/documentService';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
@@ -176,4 +176,23 @@ export const getDocumentHistory = asyncHandler(async (req: Request, res: Respons
   const history = await documentService.getDocumentHistory(boq_item_id, section, doc_number);
 
   res.json({ success: true, data: history });
+});
+
+// GET /api/documents/:documentId/itp-items
+export const getItpItems = asyncHandler(async (req: Request, res: Response) => {
+  const items = await documentService.getItpItems(req.params.documentId, req.user);
+  res.json({ success: true, data: items });
+});
+
+// PUT /api/documents/:documentId/itp-items — Vendor-only current FIELD_ITP draft
+export const saveItpItems = asyncHandler(async (req: Request, res: Response) => {
+  const { items = [] } = req.body;
+  const result = await documentService.saveItpItems(
+    req.params.documentId,
+    req.user!.id,
+    req.user!.role as Role,
+    items,
+    req.user!.institution_id,
+  );
+  res.json({ success: true, data: result });
 });
