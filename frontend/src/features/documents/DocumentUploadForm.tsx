@@ -36,7 +36,7 @@ export function DocumentUploadForm({ isOpen, onClose, boqItemId, section, onCrea
       addToast('success', section === 'FIELD_ITP'
         ? 'Field ITP draft created. Next, add and save Inspection Items, then submit it for review.'
         : 'Document uploaded and submitted for review.');
-      queryClient.invalidateQueries({ queryKey: ['documents', boqItemId, section] });
+      queryClient.invalidateQueries({ queryKey: ['documents', boqItemId] });
       if (created?.id) onCreated?.(created);
       handleClose();
     },

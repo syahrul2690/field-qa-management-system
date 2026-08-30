@@ -9,6 +9,7 @@ import { DocumentDetailModal } from '../documents/DocumentDetailModal';
 import { DocumentReviseForm } from '../documents/DocumentReviseForm';
 import { boqApi } from '../../services/boqApi';
 import { InspectionResult, InspectionResultsSection } from './InspectionResultsSection';
+import { DocumentPresenceSummary } from './DocumentPresenceSummary';
 
 interface BoqItem {
   id: string;
@@ -29,6 +30,7 @@ interface Document {
   title: string;
   section: string;
   status?: string;
+  is_current?: boolean;
   revision_no?: number;
   created_at: string;
 }
@@ -62,9 +64,9 @@ export function BoqItemDetailPanel({ item, onClose }: BoqItemDetailPanelProps) {
 
   const isVendor = user?.role === 'VENDOR';
 
-  const { data, isLoading } = useQuery({
-    queryKey: ['documents', item?.id, activeSection],
-    queryFn: () => documentApi.list(item!.id, activeSection),
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['documents', item?.id],
+    queryFn: () => documentApi.list(item!.id),
     enabled: !!item,
   });
 
@@ -78,7 +80,8 @@ export function BoqItemDetailPanel({ item, onClose }: BoqItemDetailPanelProps) {
     enabled: !!item,
   });
 
-  const documents: Document[] = data?.data?.data ?? [];
+  const allDocuments: Document[] = data?.data?.data ?? [];
+  const documents = allDocuments.filter((document) => document.section === activeSection);
   const inspectionResults: InspectionResult[] =
     itemDetailData?.data?.data?.inspection_results ?? [];
 
@@ -113,6 +116,12 @@ export function BoqItemDetailPanel({ item, onClose }: BoqItemDetailPanelProps) {
           isError={inspectionResultsError}
         />
 
+        <DocumentPresenceSummary
+          documents={allDocuments}
+          isLoading={isLoading}
+          isError={isError}
+        />
+
         {/* Section tabs */}
         <div className="flex border-b border-gray-200 px-6">
           {SECTIONS.map((sec) => (
@@ -134,6 +143,10 @@ export function BoqItemDetailPanel({ item, onClose }: BoqItemDetailPanelProps) {
         <div className="flex-1 overflow-y-auto">
           {isLoading ? (
             <div className="py-8"><LoadingSpinner /></div>
+          ) : isError ? (
+            <div className="py-12 text-center" role="alert">
+              <p className="text-red-600 text-sm">Failed to load documents for this BoQ item.</p>
+            </div>
           ) : documents.length === 0 ? (
             <div className="py-12 text-center">
               <svg className="mx-auto h-10 w-10 text-gray-300 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">

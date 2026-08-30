@@ -44,7 +44,7 @@ export function DocumentReviseForm({
     mutationFn: (fd: FormData) => documentApi.revise(documentId, fd),
     onSuccess: () => {
       addToast('success', 'Revision draft created. Review the copied ITP rows, then submit when ready.');
-      queryClient.invalidateQueries({ queryKey: ['documents', boqItemId, section] });
+      queryClient.invalidateQueries({ queryKey: ['documents', boqItemId] });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
       handleClose();
     },

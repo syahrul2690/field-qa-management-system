@@ -766,3 +766,68 @@ the authorization contract still belong to the review workflow.
   backend build were rerun successfully after the final UI adjustments.
 - [ ] During implementation, record each completed phase, commands/tests run,
       observed results, remaining risks, and any approved scope changes here.
+
+## 2026-08-30 — BoQ document presence indicators (completed)
+
+### Objective
+
+Make the selected BoQ item's document coverage immediately legible for Field
+ITP, Procedure, and Work Method without changing document authorization,
+workflow, or approval semantics.
+
+### Scope and decisions
+
+- Reuse the existing authenticated `documentApi.list` response for the selected
+  BoQ item; do not add a new readiness or approval concept.
+- Show one section-level badge/count for each of the three document sections.
+- Count only documents with `is_current === true`; historical/superseded
+  revisions remain visible in the existing list but never make a section appear
+  populated in the summary.
+- Represent loading and API error as unavailable states, not as empty sections.
+- Preserve the existing section tabs, uploads, revisions, and document detail
+  workflows. No GitHub push or VPS deployment is part of this change.
+
+### Implementation plan
+
+- [x] Trace and document the BoQ page, detail panel, document list API, and
+      existing loading/error behavior.
+- [x] Refactor the selected-item document query to provide all sections once,
+      filter the active list locally, and invalidate the matching cache after
+      upload/revision.
+- [x] Add a reusable document-presence summary with explicit loading, error,
+      empty, current-count, and multi-revision behavior.
+- [x] Add focused frontend tests for populated/current-only, empty, loading,
+      error, and all three section states.
+- [x] Run focused frontend tests, the full frontend test suite, frontend build,
+      and relevant backend checks; preserve unrelated dirty files.
+
+### Success criteria
+
+- [x] A selected BoQ item visibly shows Field ITP, Procedure, and Work Method as
+      `Empty` or `{N} current` based only on current documents.
+- [x] Superseded/historical-only revisions do not count as document presence;
+      multiple current documents are represented by their count.
+- [x] Loading and request failure are clearly distinguishable from an empty
+      section, and the existing document list still explains its own state.
+- [x] Existing authorization and BoQ document workflows remain unchanged.
+- [x] Tests and build pass, with command results and limitations recorded below.
+
+### Work log / review
+
+- 2026-08-30 — Trace complete: `BoqTreePage` renders `BoqItemDetailPanel`;
+  the panel queried one section at a time without an error state; the document
+  list API returns current and historical rows (including linked BoQ coverage);
+  the backend item summary filters only direct current documents. No code
+  changed during tracing.
+- 2026-08-30 — Implemented `DocumentPresenceSummary` and changed the selected
+  item query to load all sections once. The summary counts only `is_current`
+  documents, keeps historical rows out of presence counts, and distinguishes
+  loading/error/unavailable from empty. Active-section rows continue to show
+  the full revision list; upload/revision mutations now invalidate the shared
+  item document cache.
+- 2026-08-30 — Verification: focused presence/inspection tests passed 7/7;
+  full frontend suite passed 28/28 across 7 files; frontend production build
+  passed; backend build passed; backend non-DB regression suite passed 121/121.
+  Existing Vite chunk/import warnings remain non-blocking. PostgreSQL-backed
+  integration tests and manual browser verification were not run in this
+  change; no push or VPS deployment was performed.
