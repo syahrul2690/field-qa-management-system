@@ -45,6 +45,7 @@ export function DocumentReviseForm({
     onSuccess: () => {
       addToast('success', 'Revision draft created. Review the copied ITP rows, then submit when ready.');
       queryClient.invalidateQueries({ queryKey: ['documents', boqItemId] });
+      queryClient.invalidateQueries({ queryKey: ['boq-tree'] });
       queryClient.invalidateQueries({ queryKey: ['notifications'] });
       handleClose();
     },
