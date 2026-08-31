@@ -33,6 +33,23 @@ export const uploadExcel = multer({
   limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
 }).single('boq_file');
 
+// ─── ITP Excel import (single file, field: itp_file, in-memory) ──────────────
+// Parse-only endpoint — the file is never persisted to disk, so memory
+// storage is used instead of the disk-based pattern above.
+
+export const uploadItpExcel = multer({
+  storage: multer.memoryStorage(),
+  fileFilter: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (['.xlsx', '.xls'].includes(ext)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only Excel files (.xlsx, .xls) are allowed'));
+    }
+  },
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+}).single('itp_file');
+
 // ─── AMS letter upload (single PDF, field: ams_file) ─────────────────────────
 
 export const uploadAmsPdf = multer({

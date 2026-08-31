@@ -1,8 +1,10 @@
 import { Request, Response } from 'express';
+import ExcelJS from 'exceljs';
 import { asyncHandler } from '../utils/asyncHandler';
 import { AppError } from '../utils/AppError';
 import { DocumentSection, Role } from '@prisma/client';
 import * as documentService from '../services/documentService';
+import { parseItpWorkbook } from '../utils/excelParser/itpSheetParser';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -195,4 +197,91 @@ export const saveItpItems = asyncHandler(async (req: Request, res: Response) => 
     req.user!.institution_id,
   );
   res.json({ success: true, data: result });
+});
+
+// POST /api/documents/itp-items/parse-excel — parses only, writes nothing.
+// The vendor reviews staged rows client-side and persists via PUT above.
+export const parseItpExcel = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.file) {
+    throw new AppError('No file uploaded. Use field name "itp_file".', 400);
+  }
+
+  const result = await parseItpWorkbook(req.file.buffer);
+  if (!result.success) {
+    throw new AppError('ITP sheet validation failed', 422, true, result.errors);
+  }
+
+  res.json({
+    success: true,
+    message: `${result.rows.length} row(s) parsed.`,
+    data: { rows: result.rows, count: result.rows.length },
+  });
+});
+
+// GET /api/documents/itp-items/template
+export const downloadItpTemplate = asyncHandler(async (_req: Request, res: Response) => {
+  const wb = new ExcelJS.Workbook();
+  wb.creator = 'Field QA Management System';
+  const ws = wb.addWorksheet('ITP');
+
+  ws.columns = [
+    { header: 'No.', key: 'no', width: 6 },
+    { header: 'Activity', key: 'activity', width: 40 },
+    { header: 'Acceptance Criteria', key: 'acceptance_criteria', width: 30 },
+    { header: 'Reference Standard', key: 'reference_standard', width: 20 },
+    { header: 'Verifying Document', key: 'verifying_document', width: 20 },
+    { header: 'Sub', key: 'sub', width: 8 },
+    { header: 'PP', key: 'pp', width: 8 },
+    { header: 'PLN', key: 'pln', width: 8 },
+    { header: 'Phase', key: 'phase', width: 16 },
+    { header: 'Category', key: 'category', width: 20 },
+  ];
+
+  const headerRow = ws.getRow(1);
+  headerRow.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+  headerRow.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF1D4ED8' } };
+  headerRow.alignment = { vertical: 'middle', horizontal: 'center' };
+  headerRow.height = 20;
+
+  const exampleRows = [
+    {
+      no: 1, activity: 'Check torque on foundation bolts', acceptance_criteria: '150 Nm ± 5%',
+      reference_standard: 'IEC 62271', verifying_document: 'Torque Test Report',
+      sub: 'P', pp: 'W', pln: 'H', phase: 'Field', category: 'Mechanical',
+    },
+    {
+      no: 2, activity: 'Insulation resistance test', acceptance_criteria: '> 1000 MΩ',
+      reference_standard: 'IEEE 43', verifying_document: 'Megger Test Report',
+      sub: 'P', pp: 'W', pln: 'W', phase: 'Field', category: 'Electrical',
+    },
+  ];
+  for (const row of exampleRows) ws.addRow(row);
+
+  // Dropdown validation on the enum columns, applied well beyond the example
+  // rows so pasted/typed rows stay constrained too.
+  const lastRow = 500;
+  const applyList = (colLetter: string, values: string[]) => {
+    for (let r = 2; r <= lastRow; r += 1) {
+      ws.getCell(`${colLetter}${r}`).dataValidation = {
+        type: 'list',
+        allowBlank: true,
+        formulae: [`"${values.join(',')}"`],
+        showErrorMessage: true,
+        errorTitle: 'Invalid value',
+        error: `Must be one of: ${values.join(', ')}`,
+      };
+    }
+  };
+  applyList('F', ['H', 'W', 'SW', 'R', 'A', 'P']); // Sub
+  applyList('G', ['H', 'W', 'SW', 'R', 'A', 'P']); // PP
+  applyList('H', ['H', 'W', 'SW', 'R', 'A', 'P']); // PLN
+  applyList('I', ['Shop', 'Field', 'Commissioning']); // Phase
+  applyList('J', ['Sipil', 'Elektrikal', 'Mekanikal', 'Instrumen Kontrol']); // Category
+
+  ws.views = [{ state: 'frozen', xSplit: 0, ySplit: 1 }];
+
+  const buffer = await wb.xlsx.writeBuffer();
+  res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+  res.setHeader('Content-Disposition', 'attachment; filename="itp_template.xlsx"');
+  res.send(Buffer.from(buffer));
 });
