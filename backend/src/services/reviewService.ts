@@ -706,6 +706,11 @@ export async function approveDocument(
   return result;
 }
 
+const COMMENT_SHEET_FIELD_LABELS: Record<string, string> = {
+  PLN_COMMENT: 'PLN Comment',
+  CONTRACTOR_RESPONSE: 'Contractor Response',
+};
+
 // ── saveCommentSheetItems ────────────────────────────────────────────────────
 
 export async function saveCommentSheetItems(
@@ -769,6 +774,16 @@ export async function saveCommentSheetItems(
             changed_by: actorId,
           },
         });
+        // Tracked in Review Comments (not just the audit table) so anyone
+        // viewing the document — including the vendor, and after the review
+        // is done — can see who touched the comment sheet and when.
+        await tx.reviewComment.create({
+          data: {
+            review_id: reviewId,
+            commenter_id: actorId,
+            comment: `Edit Comment Sheet — removed row ${row.seq_no}.`,
+          },
+        });
         await tx.commentSheetItem.update({
           where: { id: row.id },
           data: { deleted_at: new Date(), deleted_by: actorId, version: { increment: 1 } },
@@ -798,8 +813,10 @@ export async function saveCommentSheetItems(
         ['PLN_COMMENT', row.pln_comment, item.pln_comment],
         ['CONTRACTOR_RESPONSE', row.contractor_response, nextResponse],
       ] as const;
+      const changedFields: string[] = [];
       for (const [fieldName, oldValue, newValue] of changes) {
         if (oldValue !== newValue) {
+          changedFields.push(fieldName);
           await tx.commentSheetItemAudit.create({
             data: {
               review_id: reviewId,
@@ -811,6 +828,16 @@ export async function saveCommentSheetItems(
             },
           });
         }
+      }
+      if (changedFields.length > 0) {
+        const labels = changedFields.map((f) => COMMENT_SHEET_FIELD_LABELS[f] ?? f).join(', ');
+        await tx.reviewComment.create({
+          data: {
+            review_id: reviewId,
+            commenter_id: actorId,
+            comment: `Edit Comment Sheet — row ${item.seq_no}: ${labels}.`,
+          },
+        });
       }
       await tx.commentSheetItem.update({
         where: { id: row.id },
