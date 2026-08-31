@@ -22,12 +22,25 @@ interface Comment {
   created_at: string;
 }
 
+interface CommentSheetEditHistoryEntry {
+  field_name: string;
+  old_value: string | null;
+  new_value: string | null;
+  changed_by_name: string;
+  changed_by_role: string | null;
+  created_at: string;
+}
+
 interface CommentSheetItem {
   id?: string;
   seq_no: number;
   pln_comment: string;
   contractor_response?: string;
   version?: number;
+  last_edited_by?: string | null;
+  last_edited_role?: string | null;
+  last_edited_at?: string | null;
+  edit_history?: CommentSheetEditHistoryEntry[];
 }
 
 interface ReviewMarkupFile {
@@ -105,6 +118,14 @@ const formatDate = (d?: string | null) => {
   try { return format(parseISO(d), 'dd MMM yyyy HH:mm'); } catch { return d; }
 };
 
+const formatRoleLabel = (role?: string | null) =>
+  role ? role.charAt(0) + role.slice(1).toLowerCase().replace(/_/g, ' ') : '';
+
+const COMMENT_SHEET_FIELD_LABELS: Record<string, string> = {
+  PLN_COMMENT: 'PLN Comment',
+  CONTRACTOR_RESPONSE: 'Contractor Response',
+};
+
 // ── CommentSheetPanel ─────────────────────────────────────────────────────────
 
 function QrStamp({ label, stampedAt, name }: { label: string; stampedAt?: string | null; name?: string }) {
@@ -168,6 +189,10 @@ function CommentSheetPanel({ reviewId, review, canEdit, role }: CommentSheetPane
         pln_comment: i.pln_comment,
         contractor_response: i.contractor_response ?? '',
         version: i.version,
+        last_edited_by: i.last_edited_by,
+        last_edited_role: i.last_edited_role,
+        last_edited_at: i.last_edited_at,
+        edit_history: i.edit_history,
       })));
     } else {
       // Only seed a blank editable row when the viewer can actually fill it in —
@@ -289,8 +314,20 @@ function CommentSheetPanel({ reviewId, review, canEdit, role }: CommentSheetPane
                 <tr key={idx} className="hover:bg-gray-50 align-top">
                   <td className="px-3 py-2 text-center text-gray-500 font-mono border-r border-gray-100 w-12">
                     {item.seq_no}.
-                    {!!item.version && item.version > 0 && (
-                      <span className="block mt-1 text-[10px] font-sans text-indigo-600" title="This row has edit history">Edited</span>
+                    {!!item.version && item.version > 0 && item.last_edited_by && (
+                      <span
+                        className="block mt-1 text-[10px] font-sans text-indigo-600 cursor-help"
+                        title={(item.edit_history ?? [])
+                          .map((h) => `${COMMENT_SHEET_FIELD_LABELS[h.field_name] ?? h.field_name} changed by ${h.changed_by_name}, ${formatDate(h.created_at)}`)
+                          .join('\n')}
+                      >
+                        Edited by {item.last_edited_by}
+                        {item.last_edited_role
+                          && !item.last_edited_by?.toLowerCase().includes(formatRoleLabel(item.last_edited_role).toLowerCase())
+                          && ` (${formatRoleLabel(item.last_edited_role)})`}
+                        <br />
+                        {formatDate(item.last_edited_at)}
+                      </span>
                     )}
                   </td>
                   <td className="px-3 py-2 border-r border-gray-100">

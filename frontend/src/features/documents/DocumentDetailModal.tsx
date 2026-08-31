@@ -321,9 +321,10 @@ export function DocumentDetailModal({
       {/* Backdrop */}
       <div className="fixed inset-0 z-40 bg-black bg-opacity-40" onClick={requestClose} />
 
-      {/* Modal panel */}
+      {/* Modal panel — Field ITP carries a wide 10-column grid, so it gets a much
+          wider cap than a plain revision-history view needs. */}
       <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-        <div className="w-full max-w-2xl max-h-[90vh] bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden">
+        <div className={`w-full ${section === 'FIELD_ITP' ? 'max-w-6xl' : 'max-w-2xl'} max-h-[90vh] bg-white rounded-xl shadow-2xl flex flex-col overflow-hidden`}>
           {/* Header */}
           <div className="flex items-start justify-between px-6 py-5 border-b border-gray-200 bg-gray-50 flex-shrink-0">
             <div className="min-w-0 flex-1 pr-4">
