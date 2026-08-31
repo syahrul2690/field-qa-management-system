@@ -23,25 +23,63 @@ export interface BoqTreeNode extends BoqItemNode {
 
 export type BoqDocumentSection = 'FIELD_ITP' | 'PROCEDURE' | 'WORK_METHOD';
 
-export type BoqDocumentCounts = Record<BoqDocumentSection, number>;
+// Worst-first severity so a rejected document can never be masked by an
+// unrelated approved one, and a rollup to an ancestor never hides it either.
+export type BoqDocumentStatus = 'empty' | 'approved' | 'pending' | 'rejected';
+
+export interface BoqSectionFlag {
+  status: BoqDocumentStatus;
+  count: number;
+}
+
+export type BoqDocumentCounts = Record<BoqDocumentSection, BoqSectionFlag>;
 
 export interface CurrentDocumentCoverage {
   boq_item_id: string;
   section: string;
   is_current: boolean;
+  status: string;
   boq_item_links?: Array<{ boq_item_id: string }>;
 }
 
 const DOCUMENT_SECTIONS: BoqDocumentSection[] = ['FIELD_ITP', 'PROCEDURE', 'WORK_METHOD'];
 
+const STATUS_SEVERITY: Record<BoqDocumentStatus, number> = {
+  empty: 0,
+  approved: 1,
+  pending: 2,
+  rejected: 3,
+};
+
+const REJECTED_STATUSES = new Set(['REJECTED_C']);
+const APPROVED_STATUSES = new Set(['APPROVED_A', 'APPROVED_WITH_COMMENTS_B']);
+
+function toFlagStatus(documentStatus: string): BoqDocumentStatus {
+  if (REJECTED_STATUSES.has(documentStatus)) return 'rejected';
+  if (APPROVED_STATUSES.has(documentStatus)) return 'approved';
+  // DRAFT / SUBMITTED / IN_REVIEW, and anything unrecognized — still in flight.
+  return 'pending';
+}
+
+function worseStatus(a: BoqDocumentStatus, b: BoqDocumentStatus): BoqDocumentStatus {
+  return STATUS_SEVERITY[b] > STATUS_SEVERITY[a] ? b : a;
+}
+
 function emptyDocumentCounts(): BoqDocumentCounts {
-  return { FIELD_ITP: 0, PROCEDURE: 0, WORK_METHOD: 0 };
+  return {
+    FIELD_ITP: { status: 'empty', count: 0 },
+    PROCEDURE: { status: 'empty', count: 0 },
+    WORK_METHOD: { status: 'empty', count: 0 },
+  };
 }
 
 /**
- * Attach current document counts to each tree item. A document can cover more
- * than one BoQ item through DocumentBoqItem links, so every covered item gets
- * the same current-document presence. Historical revisions are ignored.
+ * Attach each item's own current-document coverage (not counting descendants).
+ * A document can cover more than one BoQ item through DocumentBoqItem links,
+ * so every covered item gets the same coverage. Historical revisions are
+ * ignored. A section's status is the worst status among its current
+ * documents (rejected > pending > approved) so a rejected document is never
+ * masked by an unrelated approved one in the same section.
  */
 export function attachDocumentCounts<T extends { id: string }>(
   items: T[],
@@ -53,10 +91,14 @@ export function attachDocumentCounts<T extends { id: string }>(
   for (const document of documents) {
     if (!document.is_current || !DOCUMENT_SECTIONS.includes(document.section as BoqDocumentSection)) continue;
     const section = document.section as BoqDocumentSection;
+    const flagStatus = toFlagStatus(document.status);
     const coveredItemIds = [document.boq_item_id, ...(document.boq_item_links ?? []).map((link) => link.boq_item_id)];
     for (const itemId of new Set(coveredItemIds)) {
       const counts = countsByItem.get(itemId);
-      if (counts) counts[section] += 1;
+      if (!counts) continue;
+      const flag = counts[section];
+      flag.count += 1;
+      flag.status = worseStatus(flag.status, flagStatus);
     }
   }
 
@@ -64,6 +106,35 @@ export function attachDocumentCounts<T extends { id: string }>(
     ...item,
     document_counts: countsByItem.get(item.id) ?? emptyDocumentCounts(),
   }));
+}
+
+/**
+ * Roll each node's document coverage up from its own documents plus every
+ * descendant's, so a collapsed parent shows the worst status hiding anywhere
+ * underneath it instead of only what's attached to the parent row itself.
+ */
+export function rollupDocumentCounts<T extends BoqTreeNode>(nodes: T[]): T[] {
+  for (const node of nodes) {
+    if (node.children.length === 0) continue;
+    rollupDocumentCounts(node.children as T[]);
+
+    const own = node.document_counts ?? emptyDocumentCounts();
+    const rolled = emptyDocumentCounts();
+    for (const section of DOCUMENT_SECTIONS) {
+      rolled[section].status = own[section].status;
+      rolled[section].count = own[section].count;
+    }
+
+    for (const child of node.children) {
+      const childCounts = child.document_counts ?? emptyDocumentCounts();
+      for (const section of DOCUMENT_SECTIONS) {
+        rolled[section].count += childCounts[section].count;
+        rolled[section].status = worseStatus(rolled[section].status, childCounts[section].status);
+      }
+    }
+    node.document_counts = rolled;
+  }
+  return nodes;
 }
 
 // ─── Build nested tree from flat array (in-memory, O(n)) ─────────────────────
