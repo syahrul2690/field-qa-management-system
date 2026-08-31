@@ -841,15 +841,17 @@ export async function getCommentSheetItems(reviewId: string) {
     where: { review_id: reviewId, deleted_at: null },
     orderBy: { seq_no: 'asc' },
   });
-  if (items.length === 0) return items;
 
   // Field-level edit history, newest first, so a row's badge can attribute
   // its most recent change and a hover tooltip can show the full trail.
-  const audits = await prisma.commentSheetItemAudit.findMany({
-    where: { item_id: { in: items.map((item) => item.id) } },
-    orderBy: { created_at: 'desc' },
-    include: { actor: { select: { name: true, role: true } } },
-  });
+  // Skipped entirely when there's nothing to attribute.
+  const audits = items.length === 0
+    ? []
+    : await prisma.commentSheetItemAudit.findMany({
+      where: { item_id: { in: items.map((item) => item.id) } },
+      orderBy: { created_at: 'desc' },
+      include: { actor: { select: { name: true, role: true } } },
+    });
 
   const auditsByItem = new Map<string, typeof audits>();
   for (const audit of audits) {
