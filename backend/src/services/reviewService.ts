@@ -837,9 +837,47 @@ export async function getCommentSheetItems(reviewId: string) {
   const review = await prisma.documentReview.findUnique({ where: { id: reviewId } });
   if (!review) throw new AppError('Review not found', 404);
 
-  return prisma.commentSheetItem.findMany({
+  const items = await prisma.commentSheetItem.findMany({
     where: { review_id: reviewId, deleted_at: null },
     orderBy: { seq_no: 'asc' },
+  });
+
+  // Field-level edit history, newest first, so a row's badge can attribute
+  // its most recent change and a hover tooltip can show the full trail.
+  // Skipped entirely when there's nothing to attribute.
+  const audits = items.length === 0
+    ? []
+    : await prisma.commentSheetItemAudit.findMany({
+      where: { item_id: { in: items.map((item) => item.id) } },
+      orderBy: { created_at: 'desc' },
+      include: { actor: { select: { name: true, role: true } } },
+    });
+
+  const auditsByItem = new Map<string, typeof audits>();
+  for (const audit of audits) {
+    if (!audit.item_id) continue;
+    const list = auditsByItem.get(audit.item_id);
+    if (list) list.push(audit);
+    else auditsByItem.set(audit.item_id, [audit]);
+  }
+
+  return items.map((item) => {
+    const history = auditsByItem.get(item.id) ?? [];
+    const latest = history[0];
+    return {
+      ...item,
+      last_edited_by: latest?.actor?.name ?? null,
+      last_edited_role: latest?.actor?.role ?? null,
+      last_edited_at: latest?.created_at ?? null,
+      edit_history: history.map((audit) => ({
+        field_name: audit.field_name,
+        old_value: audit.old_value,
+        new_value: audit.new_value,
+        changed_by_name: audit.actor?.name ?? 'Unknown',
+        changed_by_role: audit.actor?.role ?? null,
+        created_at: audit.created_at,
+      })),
+    };
   });
 }
 
