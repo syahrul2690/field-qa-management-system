@@ -29,4 +29,13 @@ export const documentApi = {
       category: string;
     }>,
   ) => apiClient.put(`/documents/${documentId}/itp-items`, { items }),
+  parseItpExcel: (file: File) => {
+    const fd = new FormData();
+    fd.append('itp_file', file);
+    return apiClient.post('/documents/itp-items/parse-excel', fd, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    });
+  },
+  downloadItpTemplate: () =>
+    apiClient.get('/documents/itp-items/template', { responseType: 'blob' }),
 };

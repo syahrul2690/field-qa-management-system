@@ -3,6 +3,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { documentApi } from '../../services/documentApi';
 import { useUIStore } from '../../store/uiStore';
 import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
+import { ItpImportModal, ParsedItpRow } from './ItpImportModal';
+import { mergeImportedRows } from './itpImportMerge';
 
 type InspectionLevelCode = 'H' | 'W' | 'SW' | 'R' | 'A' | 'P' | '';
 
@@ -66,6 +68,7 @@ export function ItpItemPanel({ documentId, canEdit, onDirtyChange }: ItpItemPane
   const savedItems: ItpItem[] = itemsData?.data?.data ?? [];
   const [localItems, setLocalItems] = useState<ItpItem[] | null>(null);
   const [dirty, setDirty] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
 
   useEffect(() => {
     if (isLoading || isError || itemsData === undefined || dirty) return;
@@ -118,6 +121,11 @@ export function ItpItemPanel({ documentId, canEdit, onDirtyChange }: ItpItemPane
     setLocalItems((prev) => (prev ?? []).map((item, i) => i === idx ? { ...item, [field]: value } : item));
     setDirty(true);
   }
+  function handleImported(rows: ParsedItpRow[], mode: 'append' | 'replace') {
+    setLocalItems((prev) => mergeImportedRows(prev ?? [], rows, mode) as ItpItem[]);
+    setDirty(true);
+  }
+  const stagedNonEmptyCount = (localItems ?? []).filter((i) => i.activity.trim()).length;
 
   return (
     <div className="card overflow-hidden border-l-4 border-amber-400">
@@ -127,6 +135,17 @@ export function ItpItemPanel({ documentId, canEdit, onDirtyChange }: ItpItemPane
           <h2 className="font-semibold text-gray-900">ITP Inspection Items</h2>
           <span className="badge bg-amber-100 text-amber-700 text-xs">{savedItems.length} item{savedItems.length !== 1 ? 's' : ''}</span>
         </div>
+        {canEdit && (
+          <button
+            onClick={() => setImportOpen(true)}
+            className="text-sm text-amber-700 hover:text-amber-800 flex items-center gap-1.5 font-medium"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+            </svg>
+            Import from Excel
+          </button>
+        )}
       </div>
 
       {canEdit && (
@@ -158,6 +177,15 @@ export function ItpItemPanel({ documentId, canEdit, onDirtyChange }: ItpItemPane
           <div className="px-4 py-2 border-t border-gray-100 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-gray-500">{INSPECTION_LEVELS.filter((l) => l.value).map((l) => <span key={l.value} className="flex items-center gap-1"><span className={`inline-block px-1.5 rounded font-semibold ${LEVEL_BADGE_CLASS[l.value]}`}>{l.value}</span>{INSPECTION_LEVEL_MEANING[l.value]}</span>)}</div>
           {canEdit && <div className="px-4 py-3 border-t border-gray-100 flex items-center justify-between"><button onClick={addRow} className="text-sm text-amber-600 hover:text-amber-700 flex items-center gap-1.5 font-medium"><svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" /></svg>Add Inspection Item</button><button onClick={() => saveMutation.mutate()} disabled={!dirty || saveMutation.isPending || localItems === null} className="btn-primary py-1.5 px-4 text-sm flex items-center gap-2">{saveMutation.isPending ? <LoadingSpinner size="sm" /> : <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>}{saveMutation.isPending ? 'Saving...' : dirty ? 'Save ITP Items' : 'Saved'}</button></div>}
         </div>}
+
+      {canEdit && (
+        <ItpImportModal
+          isOpen={importOpen}
+          onClose={() => setImportOpen(false)}
+          existingCount={stagedNonEmptyCount}
+          onImported={handleImported}
+        />
+      )}
     </div>
   );
 }
