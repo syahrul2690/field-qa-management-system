@@ -7,6 +7,7 @@ import {
   generateSystemTag,
   buildBoqTree,
   attachDocumentCounts,
+  rollupDocumentCounts,
   BoqItemNode,
   BoqTreeNode,
 } from './boqTreeService';
@@ -96,10 +97,11 @@ export async function getBoqTree(projectId: string): Promise<BoqTreeNode[]> {
         boq_item_id: true,
         section: true,
         is_current: true,
+        status: true,
         boq_item_links: { select: { boq_item_id: true } },
       },
     });
-  return buildBoqTree(attachDocumentCounts(items as BoqItemNode[], documents));
+  return rollupDocumentCounts(buildBoqTree(attachDocumentCounts(items as BoqItemNode[], documents)));
 }
 
 // ─── Get direct children of a BoQ item (lazy loading) ────────────────────────
