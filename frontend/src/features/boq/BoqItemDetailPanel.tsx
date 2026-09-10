@@ -52,7 +52,6 @@ interface ReviseDoc {
 const SECTIONS = [
   { key: 'FIELD_ITP', label: 'Field ITP' },
   { key: 'PROCEDURE', label: 'Procedure' },
-  { key: 'WORK_METHOD', label: 'Work Method' },
 ];
 
 export function BoqItemDetailPanel({ item, onClose }: BoqItemDetailPanelProps) {

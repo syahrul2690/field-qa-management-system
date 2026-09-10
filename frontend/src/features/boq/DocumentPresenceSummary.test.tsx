@@ -18,7 +18,7 @@ describe('DocumentPresenceSummary', () => {
 
     expect(screen.getByLabelText('Field ITP: 1 current')).toBeInTheDocument();
     expect(screen.getByLabelText('Procedure: 2 current')).toBeInTheDocument();
-    expect(screen.getByLabelText('Work Method: Empty')).toBeInTheDocument();
+    expect(screen.queryByText('Work Method')).not.toBeInTheDocument();
   });
 
   it('shows empty state for an item with no documents', () => {
@@ -26,13 +26,12 @@ describe('DocumentPresenceSummary', () => {
 
     expect(screen.getByLabelText('Field ITP: Empty')).toBeInTheDocument();
     expect(screen.getByLabelText('Procedure: Empty')).toBeInTheDocument();
-    expect(screen.getByLabelText('Work Method: Empty')).toBeInTheDocument();
   });
 
   it('distinguishes loading from empty', () => {
     render(<DocumentPresenceSummary documents={[]} isLoading />);
 
-    expect(screen.getAllByText('Loading…')).toHaveLength(3);
+    expect(screen.getAllByText('Loading…')).toHaveLength(2);
     expect(screen.getByRole('status')).toHaveTextContent('Checking document coverage');
     expect(screen.queryByText('Empty')).not.toBeInTheDocument();
   });
@@ -40,7 +39,7 @@ describe('DocumentPresenceSummary', () => {
   it('distinguishes an API error from empty', () => {
     render(<DocumentPresenceSummary documents={[]} isError />);
 
-    expect(screen.getAllByText('Unavailable')).toHaveLength(3);
+    expect(screen.getAllByText('Unavailable')).toHaveLength(2);
     expect(screen.getByRole('alert')).toHaveTextContent('could not be loaded');
     expect(screen.queryByText('Empty')).not.toBeInTheDocument();
   });

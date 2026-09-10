@@ -44,6 +44,15 @@ export const config = {
     apiKey: process.env.INTEGRATION_API_KEY ?? '',
   },
 
+  fieldQc: {
+    apiUrl: process.env.FIELD_QC_API_URL ?? 'http://localhost:3001',
+    // A dedicated key is preferred. Falling back to the existing integration
+    // key keeps current QA/QC deployments compatible during rollout.
+    monitoringApiKey:
+      process.env.FIELD_QC_MONITORING_API_KEY ?? process.env.INTEGRATION_API_KEY ?? '',
+    timeoutMs: Math.max(1_000, parseInt(process.env.FIELD_QC_TIMEOUT_MS ?? '5000', 10) || 5_000),
+  },
+
   knowledgeBase: {
     // In local dev, __dirname is backend/src/config → three levels up is the repo
     // root, where Knowledge_Base/ lives. In the Docker production image there is no

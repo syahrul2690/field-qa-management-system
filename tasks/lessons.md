@@ -274,3 +274,10 @@ _This file tracks patterns and corrections to prevent repeated mistakes._
 - Rule: when adding a legacy fallback to list visibility, apply the same fallback
   to the corresponding mutating actions, or the UI will show items the user
   cannot work on.
+
+### Lesson 33: Cross-application readiness must follow artifact ownership
+- A readiness API must not require a document that the consuming application
+  itself owns; doing so creates a circular dependency and blocks valid work.
+- Rule: Field QA readiness reports only Field ITP and Procedure. Field QC owns
+  WMS lifecycle decisions, while Field QA consumes a separate read-only WMS
+  monitoring contract and keeps historical local WMS rows audit-only.

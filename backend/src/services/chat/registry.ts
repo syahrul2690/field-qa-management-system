@@ -33,7 +33,7 @@ export interface ToolDef<A = unknown> {
   handler: (args: A, ctx: ToolCtx) => Promise<unknown>;
 }
 
-const SECTIONS = ['FIELD_ITP', 'PROCEDURE', 'WORK_METHOD'] as const;
+const SECTIONS = ['FIELD_ITP', 'PROCEDURE'] as const;
 const STATUSES = [
   'DRAFT',
   'SUBMITTED',
@@ -66,8 +66,8 @@ const listMyProjects: ToolDef<{ query?: string; limit?: number }> = {
 const getProjectStatus: ToolDef<{ project_id: string }> = {
   name: 'get_project_status',
   description:
-    'Full status for one project: document counts by status and by section (Field ITP / Procedure / ' +
-    'Work Method), completion percentage, overdue review count, average review duration, and the ' +
+    'Full status for one project: Field ITP and Procedure counts by status and section, ' +
+    'completion percentage, overdue review count, average review duration, and the ' +
     'documents currently past their SLA. Resolve the project id with list_my_projects first.',
   parameters: {
     type: 'object',

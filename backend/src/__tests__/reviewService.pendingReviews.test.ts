@@ -32,23 +32,28 @@ describe('reviewService — pending reviews for PIC Consultant', () => {
     const activeWhere = mockPrisma.documentReview.findMany.mock.calls[0][0].where;
 
     expect(activeWhere).toEqual({
-      final_status: null,
-      reviewed_at: null,
-      OR: [
-        { reviewer_id: null },
-        { checker_id: null },
-        { approver_id: null },
-      ],
-      document: {
-        boq_item: {
-          project: {
-            OR: [
-              { consultant_pics: { some: { consultant_id: 'consultant-1' } } },
-              { consultant_pics: { none: {} } },
-            ],
+      AND: [
+        {
+          final_status: null,
+          reviewed_at: null,
+          OR: [
+            { reviewer_id: null },
+            { checker_id: null },
+            { approver_id: null },
+          ],
+          document: {
+            boq_item: {
+              project: {
+                OR: [
+                  { consultant_pics: { some: { consultant_id: 'consultant-1' } } },
+                  { consultant_pics: { none: {} } },
+                ],
+              },
+            },
           },
         },
-      },
+        { document: { section: { not: 'WORK_METHOD' } } },
+      ],
     });
   });
 
@@ -58,18 +63,23 @@ describe('reviewService — pending reviews for PIC Consultant', () => {
     const amsWhere = mockPrisma.documentReview.findMany.mock.calls[1][0].where;
 
     expect(amsWhere).toEqual({
-      final_status: { not: null },
-      ams_letter: { is: null },
-      document: {
-        boq_item: {
-          project: {
-            OR: [
-              { consultant_pics: { some: { consultant_id: 'consultant-1' } } },
-              { consultant_pics: { none: {} } },
-            ],
+      AND: [
+        {
+          final_status: { not: null },
+          ams_letter: { is: null },
+          document: {
+            boq_item: {
+              project: {
+                OR: [
+                  { consultant_pics: { some: { consultant_id: 'consultant-1' } } },
+                  { consultant_pics: { none: {} } },
+                ],
+              },
+            },
           },
         },
-      },
+        { document: { section: { not: 'WORK_METHOD' } } },
+      ],
     });
   });
 });

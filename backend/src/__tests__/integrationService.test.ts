@@ -41,13 +41,6 @@ describe('integrationService', () => {
         revision_no: 1,
         status: ReviewStatus.APPROVED_WITH_COMMENTS_B,
         title: 'Procedure',
-      }])
-      .mockResolvedValueOnce([{
-        id: 'doc-method',
-        doc_number: 'WM-001',
-        revision_no: 1,
-        status: ReviewStatus.APPROVED_A,
-        title: 'Work Method',
       }]);
     const inspectionResults = [{ id: 'result-1', status: 'APPROVED' }];
     mockPrisma.boqItemInspectionResult.findMany.mockResolvedValue(inspectionResults);
@@ -58,10 +51,9 @@ describe('integrationService', () => {
     expect(result?.sections.map((section) => section.section)).toEqual([
       DocumentSection.FIELD_ITP,
       DocumentSection.PROCEDURE,
-      DocumentSection.WORK_METHOD,
     ]);
     expect(result?.inspection_results).toBe(inspectionResults);
-    expect(mockPrisma.document.findMany).toHaveBeenCalledTimes(3);
+    expect(mockPrisma.document.findMany).toHaveBeenCalledTimes(2);
     expect(mockPrisma.document.findMany).toHaveBeenNthCalledWith(
       1,
       expect.objectContaining({
@@ -74,7 +66,6 @@ describe('integrationService', () => {
     mockPrisma.boqItem.findUnique.mockResolvedValue({ id: 'boq-1' });
     mockPrisma.document.findMany
       .mockResolvedValueOnce([{ id: 'doc-1' }, { id: 'doc-2' }])
-      .mockResolvedValueOnce([])
       .mockResolvedValueOnce([]);
     mockPrisma.boqItemInspectionResult.findMany.mockResolvedValue([]);
 

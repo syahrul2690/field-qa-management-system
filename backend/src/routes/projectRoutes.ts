@@ -18,6 +18,7 @@ import {
   getDashboard,
   exportDashboard,
   getApprovedDocumentsByProject,
+  getProjectWmsMonitoring,
 } from '../controllers/projectController';
 
 export const projectRoutes = Router();
@@ -89,3 +90,5 @@ projectRoutes.delete(
 );
 // GET /projects/:id/approved-documents — list approved docs for a project
 projectRoutes.get('/:id/approved-documents', authMiddleware, getApprovedDocumentsByProject);
+// Read-only WMS status from Field QC. No WMS mutations are exposed in Field QA.
+projectRoutes.get('/:id/wms-monitoring', authMiddleware, getProjectWmsMonitoring);

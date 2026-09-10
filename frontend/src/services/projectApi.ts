@@ -23,4 +23,6 @@ export const projectApi = {
     apiClient.get('/projects/dashboard/export', { params, responseType: 'blob' }),
   approvedDocuments: (id: string) =>
     apiClient.get(`/projects/${id}/approved-documents`),
+  wmsMonitoring: (id: string, params?: Record<string, string>) =>
+    apiClient.get(`/projects/${id}/wms-monitoring`, { params }),
 };

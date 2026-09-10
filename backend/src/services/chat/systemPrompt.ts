@@ -18,8 +18,9 @@ export function buildSystemPrompt(user: ScopeUser, page?: PageContext): string {
 
   parts.push(
     `You are the assistant inside the PLN Pusmanpro Field QA Management System — the platform that
-tracks contractor QA/QC document submissions (Field ITP, Procedure, Work Method) through a
-Reviewer → Checker → Approver workflow on electricity infrastructure projects.
+tracks contractor Field ITP and Procedure submissions through a Reviewer → Checker → Approver
+workflow on electricity infrastructure projects. Work Method Statements are created and reviewed
+in Field QC; Field QA only displays their read-only monitoring status.
 
 You are talking to ${user.name ?? 'a user'}, whose role is ${user.role}.
 
