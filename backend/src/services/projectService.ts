@@ -1,4 +1,4 @@
-import { InstitutionType, ProjectType, ProjectUrgency, Role, UserStatus } from '@prisma/client';
+import { DocumentSection, InstitutionType, ProjectType, ProjectUrgency, Role, UserStatus } from '@prisma/client';
 import { prisma } from '../config/database';
 import { AppError } from '../utils/AppError';
 
@@ -106,7 +106,7 @@ export async function listProjects(filters: {
       select: {
         project_id: true,
         documents: {
-          where: { is_current: true },
+          where: { is_current: true, section: { not: DocumentSection.WORK_METHOD } },
           select: { id: true, title: true, doc_number: true, section: true, status: true },
           orderBy: { doc_number: 'asc' },
         },
@@ -500,7 +500,7 @@ export async function getDashboardData(filters: {
     select: {
       project_id: true,
       documents: {
-        where: { is_current: true },
+        where: { is_current: true, section: { not: DocumentSection.WORK_METHOD } },
         select: { id: true, status: true, title: true, doc_number: true, section: true },
       },
     },
@@ -516,7 +516,12 @@ export async function getDashboardData(filters: {
   }
 
   const supersededDocs = await prisma.document.findMany({
-    where: { is_current: false, status: 'SUPERSEDED', boq_item: { project_id: { in: projectIds } } },
+    where: {
+      is_current: false,
+      status: 'SUPERSEDED',
+      section: { not: DocumentSection.WORK_METHOD },
+      boq_item: { project_id: { in: projectIds } },
+    },
     select: { boq_item: { select: { project_id: true } } },
   });
   const supersededByProject: Record<string, number> = {};
@@ -531,7 +536,10 @@ export async function getDashboardData(filters: {
     where: {
       final_status: null,
       sla_deadline: { lt: now },
-      document: { boq_item: { project_id: { in: projectIds } } },
+      document: {
+        section: { not: DocumentSection.WORK_METHOD },
+        boq_item: { project_id: { in: projectIds } },
+      },
     },
     select: {
       id: true,
@@ -616,7 +624,11 @@ export async function getDashboardData(filters: {
   const amsLetters = await prisma.amsLetter.findMany({
     where: {
       review: {
-        document: { is_current: true, boq_item: { project_id: { in: projectIds } } },
+        document: {
+          is_current: true,
+          section: { not: DocumentSection.WORK_METHOD },
+          boq_item: { project_id: { in: projectIds } },
+        },
       },
     },
     select: {
@@ -708,6 +720,7 @@ export async function getApprovedDocumentsByProject(projectId: string) {
       documents: {
         where: {
           is_current: true,
+          section: { not: DocumentSection.WORK_METHOD },
           status: { in: ['APPROVED_A', 'APPROVED_WITH_COMMENTS_B', 'REJECTED_C'] },
         },
         select: {

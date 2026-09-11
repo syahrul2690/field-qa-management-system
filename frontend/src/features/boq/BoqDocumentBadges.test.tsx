@@ -23,7 +23,7 @@ describe('BoqDocumentBadges', () => {
     );
 
     expect(screen.getByLabelText('Field ITP: 1 current, approved')).toHaveTextContent('ITP 1');
-    expect(screen.getByLabelText('Work Method: 2 current, rejected — needs revision')).toHaveTextContent('WM 2');
+    expect(screen.queryByText(/WM 2/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Proc/)).not.toBeInTheDocument();
   });
 

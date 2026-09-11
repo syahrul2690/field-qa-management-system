@@ -6,7 +6,6 @@ export interface DocumentPresenceRecord {
 const DOCUMENT_SECTIONS = [
   { key: 'FIELD_ITP', label: 'Field ITP' },
   { key: 'PROCEDURE', label: 'Procedure' },
-  { key: 'WORK_METHOD', label: 'Work Method' },
 ] as const;
 
 interface DocumentPresenceSummaryProps {
@@ -42,7 +41,7 @@ export function DocumentPresenceSummary({
         </h3>
         <span className="text-xs text-gray-400">Current versions only</span>
       </div>
-      <div className="grid grid-cols-3 gap-2">
+      <div className="grid grid-cols-2 gap-2">
         {DOCUMENT_SECTIONS.map((section) => {
           const label = stateLabel(section.key, documents, isLoading, isError);
           const isPresent = !isLoading && !isError && label !== 'Empty';

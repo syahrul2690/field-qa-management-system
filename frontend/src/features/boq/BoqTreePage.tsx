@@ -158,7 +158,7 @@ export function BoqTreePage() {
       {!isLoading && !error && tree.length > 0 && (
         <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
           <span>
-            <span className="font-medium text-gray-600">ITP / Proc / WM</span> = Field ITP, Procedure, Work Method — number is documents found in that item and its sub-items
+            <span className="font-medium text-gray-600">ITP / Proc</span> = Field ITP and Procedure — WMS is monitored from Field QC on the project page
           </span>
           <span className="flex items-center gap-1">
             <span className="inline-block h-2 w-2 rounded-full bg-green-500" /> Approved

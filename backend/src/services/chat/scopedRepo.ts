@@ -129,7 +129,11 @@ export function createScopedRepo(user: ScopeUser) {
       if (!project) return NOT_FOUND;
 
       const documents = await prisma.document.findMany({
-        where: { boq_item: { project_id: projectId }, is_current: true },
+        where: {
+          boq_item: { project_id: projectId },
+          is_current: true,
+          section: { not: DocumentSection.WORK_METHOD },
+        },
         select: {
           id: true,
           doc_number: true,
@@ -233,7 +237,10 @@ export function createScopedRepo(user: ScopeUser) {
 
       if (args.project_id && !(await assertProject(args.project_id))) return NOT_FOUND;
 
-      const filters: Prisma.DocumentWhereInput[] = [documentWhere];
+      const filters: Prisma.DocumentWhereInput[] = [
+        documentWhere,
+        { section: { not: DocumentSection.WORK_METHOD } },
+      ];
       if (args.project_id) filters.push({ boq_item: { project_id: args.project_id } });
       if (args.section) filters.push({ section: args.section });
       if (args.status) filters.push({ status: args.status });

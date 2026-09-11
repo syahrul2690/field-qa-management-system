@@ -171,41 +171,6 @@ async function resolveCoverageIds(primaryId: string, requestedIds?: string[]): P
   return ids;
 }
 
-// ─── Phase 1 Prerequisite Check ───────────────────────────────────────────────
-
-/**
- * For WORK_METHOD documents, verify that the BoQ item already has:
- *  - At least one FIELD_ITP document that is APPROVED_A and is_current
- *  - At least one PROCEDURE document that is APPROVED_A and is_current
- */
-export async function checkPhase1Prerequisites(boqItemId: string): Promise<void> {
-  const [itpApproved, procedureApproved] = await Promise.all([
-    prisma.document.findFirst({
-      where: {
-        boq_item_id: boqItemId,
-        section: DocumentSection.FIELD_ITP,
-        status: ReviewStatus.APPROVED_A,
-        is_current: true,
-      },
-    }),
-    prisma.document.findFirst({
-      where: {
-        boq_item_id: boqItemId,
-        section: DocumentSection.PROCEDURE,
-        status: ReviewStatus.APPROVED_A,
-        is_current: true,
-      },
-    }),
-  ]);
-
-  if (!itpApproved || !procedureApproved) {
-    throw new AppError(
-      'Work Method requires approved ITP and Procedure documents (Status A).',
-      400,
-    );
-  }
-}
-
 // ─── Create Document (initial upload) ────────────────────────────────────────
 
 export async function createDocument(
@@ -213,6 +178,12 @@ export async function createDocument(
   files: Express.Multer.File[],
 ) {
   const { boq_item_id, section, doc_number, title, surat_pengantar_no, uploaded_by } = input;
+  if (section === DocumentSection.WORK_METHOD) {
+    throw new AppError(
+      'Work Method Statement is managed in Field QC. Use Monitoring WMS in Field QA.',
+      409,
+    );
+  }
   const coverageIds = await resolveCoverageIds(boq_item_id, input.boq_item_ids);
 
   // Snapshot the uploader's institution on the document. Authorization for
@@ -246,12 +217,7 @@ export async function createDocument(
     throw new AppError('Document already exists. Use revision endpoint.', 409);
   }
 
-  // 3. Special prerequisite check for WORK_METHOD section
-  if (section === DocumentSection.WORK_METHOD) {
-    await checkPhase1Prerequisites(boq_item_id);
-  }
-
-  // 4. Transactionally create document + store files + create file records
+  // 3. Transactionally create document + store files + create file records
   const document = await prisma.$transaction(async (tx) => {
     const doc = await tx.document.create({
       data: {
@@ -293,7 +259,7 @@ export async function createDocument(
   });
 
   // Field ITPs need a vendor preparation phase for Inspection Items. The
-  // existing Procedure/Work Method workflow remains immediately submitted.
+  // Procedure documents remain immediately submitted.
   if (section !== DocumentSection.FIELD_ITP) {
     const { submitForReview } = await import('./reviewService');
     await submitForReview(document!.id, uploaded_by);
@@ -313,6 +279,12 @@ export async function createRevision(
   files: Express.Multer.File[],
 ) {
   const { section, doc_number, title, surat_pengantar_no, uploaded_by } = input;
+  if (section === DocumentSection.WORK_METHOD) {
+    throw new AppError(
+      'Work Method Statement revisions are managed in Field QC.',
+      409,
+    );
+  }
 
   // 1. Find existing document
   const oldDoc = await prisma.document.findUnique({
@@ -449,7 +421,7 @@ export async function listDocuments(boqItemId: string, section?: DocumentSection
         { boq_item_id: boqItemId },
         { boq_item_links: { some: { boq_item_id: boqItemId } } },
       ],
-      ...(section ? { section } : {}),
+      ...(section ? { section } : { section: { not: DocumentSection.WORK_METHOD } }),
     },
     include: { files: true },
     orderBy: [{ section: 'asc' }, { revision_no: 'desc' }],

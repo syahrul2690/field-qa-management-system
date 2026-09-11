@@ -59,7 +59,6 @@ export async function getQcReadiness(boqItemId: string) {
   const sections: DocumentSection[] = [
     DocumentSection.FIELD_ITP,
     DocumentSection.PROCEDURE,
-    DocumentSection.WORK_METHOD,
   ];
 
   const sectionStatuses = await Promise.all(

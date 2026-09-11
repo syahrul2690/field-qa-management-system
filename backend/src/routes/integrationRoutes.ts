@@ -9,7 +9,8 @@ integrationRoutes.use(apiKeyMiddleware);
 // GET /api/integration/projects — List all projects with BOQ tree
 integrationRoutes.get('/projects', integrationController.getProjects);
 
-// GET /api/integration/boq-items/:boqItemId/qc-readiness — Check if all 3 doc sections are approved
+// GET /api/integration/boq-items/:boqItemId/qc-readiness — Check Field ITP and Procedure readiness.
+// WMS readiness is owned and validated by Field QC.
 integrationRoutes.get('/boq-items/:boqItemId/qc-readiness', integrationController.getQcReadiness);
 
 // GET /api/integration/documents/:documentId — Document metadata + ITP items

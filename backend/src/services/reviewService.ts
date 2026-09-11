@@ -1,6 +1,6 @@
 import { prisma } from '../config/database';
 import { AppError } from '../utils/AppError';
-import { ReviewStatus, DocumentSection, Role, ReviewMarkupStage } from '@prisma/client';
+import { Prisma, ReviewStatus, DocumentSection, Role, ReviewMarkupStage } from '@prisma/client';
 import { calculateSlaDeadline, isOverdue, getCurrentStage } from './slaService';
 import { generateCommentSheet } from '../utils/pdfEngine/commentSheetGenerator';
 import { config } from '../config';
@@ -18,6 +18,9 @@ export async function submitForReview(documentId: string, actorId: string) {
     where: { id: documentId },
     include: { boq_item: { include: { project: true } } },
   });
+  if (document?.section === DocumentSection.WORK_METHOD) {
+    throw new AppError('Work Method Statement review is managed in Field QC', 409);
+  }
 
   if (!document) {
     throw new AppError('Document not found', 404);
@@ -1226,12 +1229,16 @@ export async function getPendingReviews(
 
   const [activeReviews, amsReviews] = await Promise.all([
     prisma.documentReview.findMany({
-      where: activeWhereClause,
+      where: {
+        AND: [activeWhereClause, { document: { section: { not: DocumentSection.WORK_METHOD } } }],
+      },
       include: reviewInclude,
       orderBy: { sla_deadline: 'asc' },
     }),
     prisma.documentReview.findMany({
-      where: amsWhereClause,
+      where: {
+        AND: [amsWhereClause, { document: { section: { not: DocumentSection.WORK_METHOD } } }],
+      },
       include: reviewInclude,
       orderBy: { approved_at: 'desc' },
     }),
@@ -1331,6 +1338,11 @@ export async function getNotifications(
 ): Promise<Notification[]> {
   const since48h = new Date(Date.now() - 48 * 60 * 60 * 1000);
   const notifications: Notification[] = [];
+  const qaDocumentReviewWhere = (
+    where: Prisma.DocumentReviewWhereInput,
+  ): Prisma.DocumentReviewWhereInput => ({
+    AND: [where, { document: { section: { not: DocumentSection.WORK_METHOD } } }],
+  });
 
   const buildBase = (r: {
     id: string;
@@ -1369,7 +1381,7 @@ export async function getNotifications(
   // PIC_CONSULTANT — documents submitted that still need reviewer/team setup
   if (actorRole === Role.PIC_CONSULTANT) {
     const pending = await prisma.documentReview.findMany({
-      where: {
+      where: qaDocumentReviewWhere({
         final_status: null,
         reviewed_at: null,
         OR: [
@@ -1378,7 +1390,7 @@ export async function getNotifications(
           { approver_id: null },
         ],
         ...consultantPicReviewScope(actorId),
-      },
+      }),
       include: docInclude,
       orderBy: { sla_deadline: 'asc' },
     });
@@ -1396,11 +1408,11 @@ export async function getNotifications(
   if (actorRole === Role.PIC_ENGINEER) {
     const actor = await prisma.user.findUnique({ where: { id: actorId }, select: { unit_id: true } });
     const pending = await prisma.documentReview.findMany({
-      where: {
+      where: qaDocumentReviewWhere({
         final_status: null,
         reviewer_id: null,
         document: { boq_item: { project: { owner_unit_id: actor?.unit_id ?? '__none__' } } },
-      },
+      }),
       include: docInclude,
       orderBy: { sla_deadline: 'asc' },
     });
@@ -1419,11 +1431,11 @@ export async function getNotifications(
     // Only notify once PIC_CONSULTANT has explicitly assigned this reviewer —
     // unassigned reviews must not surface for every reviewer (staged workflow).
     const pending = await prisma.documentReview.findMany({
-      where: {
+      where: qaDocumentReviewWhere({
         final_status: null,
         reviewer_id: actorId,
         reviewed_at: null,
-      },
+      }),
       include: docInclude,
       orderBy: { sla_deadline: 'asc' },
     });
@@ -1441,7 +1453,7 @@ export async function getNotifications(
   if (actorRole === Role.CHECKER) {
     // ACTION_REQUIRED: it is the checker's turn (reviewer has submitted)
     const actionPending = await prisma.documentReview.findMany({
-      where: { final_status: null, checker_id: actorId, checked_at: null, reviewed_at: { not: null } },
+      where: qaDocumentReviewWhere({ final_status: null, checker_id: actorId, checked_at: null, reviewed_at: { not: null } }),
       include: docInclude,
       orderBy: { sla_deadline: 'asc' },
     });
@@ -1457,7 +1469,7 @@ export async function getNotifications(
 
     // STAGE_UPDATED: assigned but waiting for the reviewer to finish
     const awaitingReviewer = await prisma.documentReview.findMany({
-      where: { final_status: null, checker_id: actorId, checked_at: null, reviewed_at: null },
+      where: qaDocumentReviewWhere({ final_status: null, checker_id: actorId, checked_at: null, reviewed_at: null }),
       include: docInclude,
       orderBy: { sla_deadline: 'asc' },
     });
@@ -1475,7 +1487,7 @@ export async function getNotifications(
   if (actorRole === Role.APPROVER) {
     // ACTION_REQUIRED: it is the approver's turn (checker has completed)
     const actionPending = await prisma.documentReview.findMany({
-      where: { final_status: null, approver_id: actorId, approved_at: null, checked_at: { not: null } },
+      where: qaDocumentReviewWhere({ final_status: null, approver_id: actorId, approved_at: null, checked_at: { not: null } }),
       include: docInclude,
       orderBy: { sla_deadline: 'asc' },
     });
@@ -1491,12 +1503,12 @@ export async function getNotifications(
 
     // STAGE_UPDATED: assigned but waiting for reviewer/checker to finish
     const awaitingProgress = await prisma.documentReview.findMany({
-      where: {
+      where: qaDocumentReviewWhere({
         final_status: null,
         approver_id: actorId,
         approved_at: null,
         checked_at: null,
-      },
+      }),
       include: docInclude,
       orderBy: { sla_deadline: 'asc' },
     });
@@ -1521,6 +1533,7 @@ export async function getNotifications(
         uploaded_by: actorId,
         status: 'REJECTED_C',
         is_current: true,
+        section: { not: DocumentSection.WORK_METHOD },
       },
       select: {
         id: true,
@@ -1568,11 +1581,11 @@ export async function getNotifications(
 
     // ── STATUS UPDATES: recently updated non-rejected reviews ────────────────
     const recentlyUpdated = await prisma.documentReview.findMany({
-      where: {
+      where: qaDocumentReviewWhere({
         updated_at: { gte: since48h },
         document: { uploader: { id: actorId } },
         final_status: { not: 'REJECTED_C' },
-      },
+      }),
       include: docInclude,
       orderBy: { updated_at: 'desc' },
     });
@@ -1601,7 +1614,7 @@ export async function getNotifications(
       : 'approver_id';
 
     const recentlyUpdated = await prisma.documentReview.findMany({
-      where: {
+      where: qaDocumentReviewWhere({
         [involvedField]: actorId,
         updated_at: { gte: since48h },
         // Exclude reviews already listed in ACTION_REQUIRED section above
@@ -1612,7 +1625,7 @@ export async function getNotifications(
           // APPROVER: show progress updates — ACTION_REQUIRED (checked_at NOT NULL) will be
           // de-duped by the id check below; this also surfaces recent final-status completions
           : { OR: [{ reviewed_at: { not: null } }, { checked_at: { not: null } }, { final_status: { not: null } }] }),
-      },
+      }),
       include: docInclude,
       orderBy: { updated_at: 'desc' },
     });

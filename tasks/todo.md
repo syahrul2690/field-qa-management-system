@@ -890,3 +890,29 @@ items such as Steel Fabrication, before the user opens the detail panel.
   frontend and backend builds passed. Existing Vite import/chunk warnings are
   non-blocking. PostgreSQL-backed integration and manual browser verification
   remain pending; no push or deployment was performed.
+# Field QC-owned WMS integration — 2026-09-10
+
+- [x] Change QC readiness to require only current approved FIELD_ITP and PROCEDURE documents.
+- [x] Block new WORK_METHOD uploads and revisions in Field QA without deleting historical records.
+- [x] Remove WORK_METHOD authoring entry points from the BOQ document UI.
+- [x] Add a timeout-protected, service-key Field QC monitoring client.
+- [x] Add an authenticated, project-scoped read-only WMS monitoring endpoint in Field QA.
+- [x] Add a responsive Monitoring WMS panel to the project detail page.
+- [x] Document the required Field QA and Field QC environment variables.
+- [x] Add regression tests and run backend/frontend builds and focused tests.
+
+## Review
+
+- Field QA now owns only Field ITP and Procedure authoring/review. Historical
+  WORK_METHOD rows remain readable for audit purposes but are excluded from
+  authoring, queues, notifications, dashboards, readiness, and default lists.
+- Project detail now includes responsive, paginated WMS monitoring sourced
+  read-only from Field QC, with process/final-status filters, BOQ labels, dates,
+  and a link to the Field QC detail page.
+- Deployment supports a dedicated monitoring key and safely falls back to the
+  existing QA/QC integration key during rollout. Calls fail closed with a 503
+  when configuration, connectivity, or response shape is invalid.
+- Verification: backend TypeScript build passed; 193/193 non-DB backend tests
+  passed; frontend TypeScript/build passed and 38/38 tests passed. The two
+  existing DB-backed suites require a provisioned PostgreSQL test database and
+  could not run against the unavailable local test credentials.

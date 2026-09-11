@@ -12,7 +12,6 @@ export type BoqDocumentCounts = Record<BoqDocumentSection, BoqSectionFlag>;
 const SECTIONS: Array<{ key: BoqDocumentSection; shortLabel: string; label: string }> = [
   { key: 'FIELD_ITP', shortLabel: 'ITP', label: 'Field ITP' },
   { key: 'PROCEDURE', shortLabel: 'Proc', label: 'Procedure' },
-  { key: 'WORK_METHOD', shortLabel: 'WM', label: 'Work Method' },
 ];
 
 // Rejected outranks pending outranks approved visually — a row with any

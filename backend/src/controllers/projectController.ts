@@ -4,6 +4,7 @@ import { InstitutionType, ProjectType, ProjectUrgency } from '@prisma/client';
 import { asyncHandler } from '../utils/asyncHandler';
 import { AppError } from '../utils/AppError';
 import * as projectService from '../services/projectService';
+import * as fieldQcMonitoringService from '../services/fieldQcMonitoringService';
 import { buildDashboardWorkbook } from '../utils/excelExport/dashboardExport';
 
 function dashboardFilters(req: Request): { ownerUnitId?: string; vendorInstitutionId?: string } {
@@ -215,4 +216,32 @@ export const getApprovedDocumentsByProject = asyncHandler(async (req: Request, r
   if (!req.user) throw new AppError('Unauthorized', 401);
   const docs = await projectService.getApprovedDocumentsByProject(req.params.id);
   res.json({ success: true, data: docs });
+});
+
+export const getProjectWmsMonitoring = asyncHandler(async (req: Request, res: Response) => {
+  if (!req.user) throw new AppError('Unauthorized', 401);
+
+  await projectService.getProjectById(
+    req.params.id,
+    req.user.id,
+    req.user.institution_id,
+    req.user.institution_type,
+  );
+
+  const page = typeof req.query.page === 'string' ? Number.parseInt(req.query.page, 10) : undefined;
+  const limit = typeof req.query.limit === 'string' ? Number.parseInt(req.query.limit, 10) : undefined;
+  const result = await fieldQcMonitoringService.getProjectWmsMonitoring({
+    projectId: req.params.id,
+    boqItemId: typeof req.query.boq_item_id === 'string' ? req.query.boq_item_id : undefined,
+    finalQualityStatus:
+      typeof req.query.final_quality_status === 'string'
+        ? req.query.final_quality_status
+        : undefined,
+    workflowStatus:
+      typeof req.query.workflow_status === 'string' ? req.query.workflow_status : undefined,
+    page: Number.isInteger(page) && page! > 0 ? page : undefined,
+    limit: Number.isInteger(limit) && limit! > 0 ? limit : undefined,
+  });
+
+  res.json({ success: true, data: result });
 });
